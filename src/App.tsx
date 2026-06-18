@@ -31,11 +31,14 @@ import { Product, CartItem, BillingInfo, Order, Message } from './types.ts';
 import Navbar from './components/Navbar.tsx';
 import HeroSlider from './components/HeroSlider.tsx';
 import ProductCard from './components/ProductCard.tsx';
+import OrderHistory from './components/OrderHistory.tsx';
+import AdminDashboard from './components/AdminDashboard.tsx';
 
 // Persistent storage keys
 const CART_STORAGE_KEY = 'buyoman_cart_data';
 const WISHLIST_STORAGE_KEY = 'buyoman_wishlist_data';
 const ORDERS_STORAGE_KEY = 'buyoman_orders_data';
+const PRODUCTS_STORAGE_KEY = 'buyoman_products_data';
 
 export default function App() {
   // Navigation & Category States
@@ -45,6 +48,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Cart & Wishlist & Order States
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -52,6 +56,8 @@ export default function App() {
   // Dialog Overlays
   const [cartOpen, setCartOpen] = useState<boolean>(false);
   const [wishlistOpen, setWishlistOpen] = useState<boolean>(false);
+  const [ordersOpen, setOrdersOpen] = useState<boolean>(false);
+  const [adminOpen, setAdminOpen] = useState<boolean>(false);
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState<boolean>(false);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
@@ -105,10 +111,40 @@ export default function App() {
           setActiveTrackingOrder(parsed[parsed.length - 1]);
         }
       }
+
+      const savedProducts = localStorage.getItem(PRODUCTS_STORAGE_KEY);
+      if (savedProducts) {
+        setProducts(JSON.parse(savedProducts));
+      } else {
+        setProducts(PRODUCTS_DATA);
+      }
     } catch (e) {
       console.error("Error loading localStorage state:", e);
+      setProducts(PRODUCTS_DATA);
     }
   }, []);
+
+  // Monitor url and hash changes for secret admin login access
+  useEffect(() => {
+    const checkAdminRoute = () => {
+      const hasAdminQuery = window.location.search.includes('admin=true');
+      const hasAdminHash = window.location.hash === '#admin';
+      if (hasAdminQuery || hasAdminHash) {
+        setAdminOpen(true);
+        triggerToast("🔑 Secret Admin Dashboard Opened via secure hash parameter link!");
+      }
+    };
+    checkAdminRoute();
+    window.addEventListener('hashchange', checkAdminRoute);
+    return () => window.removeEventListener('hashchange', checkAdminRoute);
+  }, []);
+
+  // Sync products to localstorage
+  useEffect(() => {
+    if (products.length > 0) {
+      localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
+    }
+  }, [products]);
 
   // Sync to localstorage
   useEffect(() => {
@@ -209,7 +245,7 @@ export default function App() {
   const cartTotal = cartSubtotal + deliveryFee;
 
   // Handle Search Filtering
-  const filteredProducts = PRODUCTS_DATA.filter((prod) => {
+  const filteredProducts = products.filter((prod) => {
     const matchesCategory = selectedCategory === 'all' || prod.category === selectedCategory;
     const matchesSearch = prod.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           prod.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -362,6 +398,23 @@ export default function App() {
   return (
     <div id="app-viewport" className="min-h-screen bg-neutral-50/50 flex flex-col font-sans select-none antialiased">
       
+      {/* Secret Admin Banner Trigger */}
+      {(window.location.search.includes('admin=true') || window.location.hash === '#admin') && (
+        <div id="admin-secret-header" className="bg-gradient-to-r from-rose-950 via-neutral-950 to-rose-950 border-b border-rose-500/30 text-white text-[11px] font-extrabold px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+            <span>🔑 ACTIVE SANDBOX ADMIN URL DETECTED: Control live warehouse dispatches or manage the OMR pricing catalog</span>
+          </div>
+          <button 
+            onClick={() => setAdminOpen(true)}
+            className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-md uppercase tracking-wider text-[10px] transition shadow-md cursor-pointer flex items-center gap-1"
+          >
+            <span>Launch Admin Workspace</span>
+            <span>➡️</span>
+          </button>
+        </div>
+      )}
+
       {/* Top Static Alert Bar */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 border border-neutral-800 text-white text-xs font-bold px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-3 animate-slide-up">
@@ -377,8 +430,10 @@ export default function App() {
       <Navbar
         cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
         wishlistCount={wishlist.length}
-        onCartClick={() => { setCartOpen(true); setWishlistOpen(false); }}
-        onWishlistClick={() => { setWishlistOpen(true); setCartOpen(false); }}
+        ordersCount={orders.length}
+        onCartClick={() => { setCartOpen(true); setWishlistOpen(false); setOrdersOpen(false); }}
+        onWishlistClick={() => { setWishlistOpen(true); setCartOpen(false); setOrdersOpen(false); }}
+        onOrdersClick={() => { setOrdersOpen(true); setCartOpen(false); setWishlistOpen(false); }}
         onSearchToggle={() => setSearchOpen(!searchOpen)}
         onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         mobileMenuOpen={mobileMenuOpen}
@@ -656,7 +711,7 @@ export default function App() {
                 onClick={() => {
                   // Add quick dummy product and open checkout to make this easy to test
                   if (cart.length === 0) {
-                    handleAddToCart(PRODUCTS_DATA[0]);
+                    handleAddToCart(products[0] || PRODUCTS_DATA[0]);
                   }
                   setCartOpen(true);
                 }}
@@ -881,10 +936,22 @@ export default function App() {
 
         <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-neutral-800 text-neutral-500 text-xs text-center flex flex-col md:flex-row md:justify-between items-center gap-4">
           <p>© 2026 BuyOman Electronics LLC. All rights reserved. Trade License No: OM-88921-X. Muscat, Oman.</p>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <a href="#" className="hover:text-neutral-400 transition">Terms of Sale</a>
             <a href="#" className="hover:text-neutral-400 transition">Privacy Directives</a>
             <a href="#" className="hover:text-neutral-400 transition">Cookies Setup</a>
+            <span className="text-neutral-700">|</span>
+            <button 
+              onClick={() => {
+                setAdminOpen(true);
+                // Set the secure URL state visually so they see it
+                window.location.hash = '#admin';
+              }} 
+              className="text-amber-500 font-extrabold hover:text-amber-400 transition flex items-center gap-1 cursor-pointer text-[11px] uppercase tracking-wider"
+              title="Sandbox Inventory Control Gateway"
+            >
+              🔒 Admin Gateway
+            </button>
           </div>
         </div>
       </footer>
@@ -1562,6 +1629,41 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ========================================= */}
+      {/* DRAWER: PERSISTENT CODES & CUSTOM PAST ORDERS */}
+      {/* ========================================= */}
+      <OrderHistory
+        isOpen={ordersOpen}
+        onClose={() => setOrdersOpen(false)}
+        orders={orders}
+        onTrackOrder={(order) => {
+          setActiveTrackingOrder(order);
+          setOrdersOpen(false);
+          // Scroll smoothly to active tracking sandbox
+          setTimeout(() => {
+            const trackingSec = document.getElementById('tracking-sandbox');
+            if (trackingSec) {
+              trackingSec.scrollIntoView({ behavior: 'smooth' });
+            }
+          }, 300);
+        }}
+        onAdvanceStatus={handleAdvanceShipment}
+      />
+
+      {/* ========================================= */}
+      {/* DRAWER: ADMIN OPERATIONS CATALOG CONTROL   */}
+      {/* ========================================= */}
+      <AdminDashboard
+        isOpen={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        products={products}
+        onUpdateProducts={setProducts}
+        orders={orders}
+        onUpdateOrders={setOrders}
+        onAdvanceOrderStatus={handleAdvanceShipment}
+        onTriggerToast={triggerToast}
+      />
 
     </div>
   );

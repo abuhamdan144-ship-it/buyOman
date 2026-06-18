@@ -4,13 +4,15 @@
  */
 
 import React from 'react';
-import { ShoppingBag, Heart, Search, Menu, X, User, BadgeAlert } from 'lucide-react';
+import { ShoppingBag, Heart, Search, Menu, X, User, BadgeAlert, Package } from 'lucide-react';
 
 interface NavbarProps {
   cartCount: number;
   wishlistCount: number;
+  ordersCount: number;
   onCartClick: () => void;
   onWishlistClick: () => void;
+  onOrdersClick: () => void;
   onSearchToggle: () => void;
   onMobileMenuToggle: () => void;
   mobileMenuOpen: boolean;
@@ -22,8 +24,10 @@ interface NavbarProps {
 export default function Navbar({
   cartCount,
   wishlistCount,
+  ordersCount,
   onCartClick,
   onWishlistClick,
+  onOrdersClick,
   onSearchToggle,
   onMobileMenuToggle,
   mobileMenuOpen,
@@ -111,6 +115,21 @@ export default function Navbar({
               )}
             </button>
 
+            {/* Order History button */}
+            <button 
+              id="orders-history bg-btn"
+              onClick={onOrdersClick}
+              className="p-2.5 rounded-full hover:bg-neutral-50 transition relative text-neutral-700"
+              title="My Order History & Status"
+            >
+              <Package className="w-5 h-5 hover:text-sky-600 transition" />
+              {ordersCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-sky-600 text-white text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                  {ordersCount}
+                </span>
+              )}
+            </button>
+
             {/* Shopping Cart button */}
             <button 
               id="cart-btn"
@@ -186,6 +205,12 @@ export default function Navbar({
               className="w-full text-center py-2 px-4 bg-emerald-600 text-white rounded-md font-bold text-xs shadow-md shadow-emerald-100 flex items-center justify-center gap-1.5"
             >
               💬 Open AI Shopping Advisor
+            </button>
+            <button 
+              onClick={() => { onOrdersClick(); onMobileMenuToggle(); }}
+              className="w-full text-center py-2 px-4 bg-neutral-900 hover:bg-sky-600 text-white rounded-md font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5"
+            >
+              📦 My Order History ({ordersCount})
             </button>
           </div>
         </div>
