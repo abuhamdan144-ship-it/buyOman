@@ -1,0 +1,6 @@
+{
+  "name": "BuyOman",
+  "description": "Oman's premier e-commerce platform for smartphones, laptops, TVs, and smart home appliances, featuring built-in simulated shopping carts, interactive checkout, and a smart AI Shopping Advisor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
