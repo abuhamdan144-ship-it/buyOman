@@ -73,6 +73,8 @@ GUIDELINES FOR YOUR CHAT:
 6. Keep recommendations elegant, succinct, and formatted beautifully using markdown with bullet points.
 `;
 
+const WEBHOOK_URL = 'https://n8n-production-ea7d.up.railway.app/webhook/buyoman-chat';
+
 app.post('/api/recommend', async (req, res) => {
   try {
     const { message, history } = req.body;
@@ -81,6 +83,58 @@ app.post('/api/recommend', async (req, res) => {
       return;
     }
 
+    // Try n8n Webhook as requested by user
+    try {
+      console.log(`Connecting to chat bot custom n8n Webhook: ${WEBHOOK_URL}`);
+      const webhookRes = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/plain, */*'
+        },
+        body: JSON.stringify({
+          message: message,
+          chatInput: message,
+          text: message,
+          history: history || []
+        })
+      });
+
+      if (webhookRes.ok) {
+        const contentType = webhookRes.headers.get('content-type') || '';
+        let replyText = "";
+
+        if (contentType.includes('application/json')) {
+          const data = await webhookRes.json();
+          console.log("n8n Webhook JSON response:", data);
+          
+          if (typeof data === 'string') {
+            replyText = data;
+          } else if (Array.isArray(data)) {
+            const first = data[0];
+            if (first) {
+              replyText = first.output || first.response || first.reply || first.text || first.message || (typeof first === 'string' ? first : JSON.stringify(first));
+            }
+          } else if (data && typeof data === 'object') {
+            replyText = data.output || data.response || data.reply || data.text || data.message || data.chatInput || JSON.stringify(data);
+          }
+        } else {
+          replyText = await webhookRes.text();
+          console.log("n8n Webhook Plain text response:", replyText);
+        }
+
+        if (replyText && typeof replyText === 'string' && replyText.trim()) {
+          res.json({ reply: replyText.trim() });
+          return;
+        }
+      } else {
+        console.warn(`n8n Webhook response code: ${webhookRes.status}. Proceeding to secondary Gemini helper.`);
+      }
+    } catch (whErr: any) {
+      console.warn("Failed sending payload to n8n webhook, using secondary Gemini service.", whErr.message);
+    }
+
+    // Secondary fallback: Gemini API or Local structured mock guidelines
     try {
       const ai = getGoogleGenAI();
       
@@ -126,7 +180,7 @@ app.post('/api/recommend', async (req, res) => {
         replyText = `### 📱 Recommended Smartphones for You!\n\nWe feature the latest devices with free door-to-door delivery across Oman:\n\n1. **iPhone 15 Pro Max (256GB)**: OMR 459.900 (Originally OMR 499.900). Stunning Aerospace Titanium shell, A17 Pro Chip, and 5x optical optical telesensing zoom.\n2. **Samsung Galaxy S24 Ultra**: OMR 389.900 (Originally OMR 449.900). Features Galaxy AI smart translation, circular search, and a gorgeous built-in S-Pen.\n3. **Xiaomi 14 Ultra (512GB)**: OMR 329.900. Co-engineered with Leica for movie-grade recording.\n\nAll mobile devices include **1-Year Local Brand Warranty**! Add any to your cart to checkout!`;
       } else if (lower.includes('tv') || lower.includes('screen') || lower.includes('display') || lower.includes('audio') || lower.includes('sony')) {
         replyText = `### 📺 Premium Home Entertainment Systems\n\nEnjoy cinematic immersion with free home setup:\n- **Samsung Neo QLED 8K Smart TV 65"**: OMR 899.000. Real 8K detailing with premium upscaling. Perfect for wide living rooms.\n- **LG OLED evo C3 Series 55"**: OMR 489.000. Absolute deep blacks and Dolby Atmos audio - a favorite for gamers and cinephiles alike.\n- **Sony WH-1000XM5 Noise Canceling Headphones**: OMR 89.900. Studio sound with automatic ambient tuning.`;
-      } else if (lower.includes('kitchen') || lower.includes('coffee') || lower.includes('fryer') || lower.includes('washing') || lower.includes('fridge') || lower.includes('fridge')  || lower.includes('appliance')) {
+      } else if (lower.includes('kitchen') || lower.includes('coffee') || lower.includes('fryer') || lower.includes('washing') || lower.includes('fridge')  || lower.includes('appliance')) {
         replyText = `### 🧺 Premium Home & Kitchen Appliances\n\nUpgrade your Omani home today structure:\n- **Samsung French Door Refrigerator 620L**: OMR 299.900. Dual multi-airflow cooling prevents food spoilage.\n- **Bosch Serie 6 Front Loader Washing Machine (9kg)**: OMR 169.900. Incredibly quiet EcoSilence motor and SpeedPerfect washes.\n- **Philips Essential Airfryer XL**: OMR 39.900. Cook delicious, low-oil dishes for the whole family.\n- **Nespresso Vertuo Pop**: OMR 69.900. Authentic espresso at the touch of a button.\n\n*Note: Free delivery and secure heavy appliance mounting are included!*`;
       } else {
         replyText = `### Hello from BuyOman AI Support! 🇴🇲\n\nWelcome to BuyOman! I am your smart shopping advisor. I can help you find suitable appliances or electronics tailored for your needs and Omani home sizes.\n\n**How to Ask me:**\n* "Which AC is best for hot Omani summers?"\n* "Can you recommend a premium smartphone under OMR 400?"\n* "What large washing machines do you recommend for a family of 5?"\n* "Suggest a good coffee maker or air fryer."\n\nTell me what you are looking for, or your budget in OMR!`;
