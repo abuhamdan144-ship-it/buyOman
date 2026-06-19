@@ -4,24 +4,28 @@
  */
 
 import React from 'react';
-import { Heart, Star, Eye, ShoppingCart } from 'lucide-react';
+import { Heart, Star, Eye, ShoppingCart, Bell } from 'lucide-react';
 import { Product } from '../types.ts';
 
 interface ProductCardProps {
   key?: number;
   product: Product;
   isWishlisted: boolean;
+  isPriceAlertSubscribed: boolean;
   onAddToCart: (product: Product) => void;
   onToggleWishlist: (product: Product) => void;
   onQuickView: (product: Product) => void;
+  onTogglePriceAlert: (product: Product) => void;
 }
 
 export default function ProductCard({
   product,
   isWishlisted,
+  isPriceAlertSubscribed,
   onAddToCart,
   onToggleWishlist,
   onQuickView,
+  onTogglePriceAlert,
 }: ProductCardProps) {
   const discountPercentage = product.oldPrice
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
@@ -53,21 +57,41 @@ export default function ProductCard({
         </span>
       )}
 
-      {/* Wishlist Button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleWishlist(product);
-        }}
-        className="absolute top-4 right-4 z-10 w-9 h-9 bg-white/80 hover:bg-white backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-neutral-500 hover:text-red-500 transition active:scale-90"
-        title={isWishlisted ? "Remove from Wishlist" : "Save to Wishlist"}
-      >
-        <Heart 
-          className={`w-4.5 h-4.5 transition-colors ${
-            isWishlisted ? 'text-red-500 fill-red-500' : 'text-neutral-500'
-          }`} 
-        />
-      </button>
+      {/* Action buttons list (Wishlist & Price alert) */}
+      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+        {/* Wishlist Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleWishlist(product);
+          }}
+          className="w-9 h-9 bg-white/80 hover:bg-white backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-neutral-500 hover:text-red-500 transition active:scale-90"
+          title={isWishlisted ? "Remove from Wishlist" : "Save to Wishlist"}
+        >
+          <Heart 
+            className={`w-4.5 h-4.5 transition-colors ${
+              isWishlisted ? 'text-red-500 fill-red-500' : 'text-neutral-500'
+            }`} 
+          />
+        </button>
+
+        {/* Notify Price Drop Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePriceAlert(product);
+          }}
+          id={`price-alert-btn-${product.id}`}
+          className="w-9 h-9 bg-white/80 hover:bg-white backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-neutral-500 hover:text-amber-500 transition active:scale-90"
+          title={isPriceAlertSubscribed ? "Stop price drop updates for this item" : "Notify me of price drops"}
+        >
+          <Bell 
+            className={`w-4.5 h-4.5 transition-colors ${
+              isPriceAlertSubscribed ? 'text-amber-505 fill-amber-400 text-amber-500' : 'text-neutral-500'
+            }`} 
+          />
+        </button>
+      </div>
 
       {/* Image Block: Centered high quality Image or Emoji fallback with ambient color */}
       <div className="h-48 bg-neutral-50/70 py-4 px-4 overflow-hidden flex items-center justify-center relative cursor-zoom-in" onClick={() => onQuickView(product)}>

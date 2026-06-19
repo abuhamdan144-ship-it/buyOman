@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShoppingBag, 
   Heart, 
@@ -24,7 +24,8 @@ import {
   CreditCard, 
   MapPin, 
   Send,
-  Sparkle
+  Sparkle,
+  Bell
 } from 'lucide-react';
 import { PRODUCTS_DATA, SMALL_APPLIANCES, OMAN_GOVERNORATES } from './data.ts';
 import { Product, CartItem, BillingInfo, Order, Message } from './types.ts';
@@ -52,6 +53,17 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+
+  // Price Drop alerts tracking lists
+  const [priceAlertSubscriptions, setPriceAlertSubscriptions] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('priceAlertSubscriptions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const prevPricesRef = useRef<Record<number, number>>({});
   
   // Dialog Overlays
   const [cartOpen, setCartOpen] = useState<boolean>(false);
@@ -145,6 +157,47 @@ export default function App() {
       localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
     }
   }, [products]);
+
+  // Sync price alert subscriptions to localStorage
+  useEffect(() => {
+    localStorage.setItem('priceAlertSubscriptions', JSON.stringify(priceAlertSubscriptions));
+  }, [priceAlertSubscriptions]);
+
+  // Monitor price drops whenever products or subscriptions change
+  useEffect(() => {
+    const currentPrices: Record<number, number> = {};
+    products.forEach((p) => {
+      currentPrices[p.id] = p.price;
+    });
+
+    if (Object.keys(prevPricesRef.current).length > 0) {
+      products.forEach((p) => {
+        const prevPrice = prevPricesRef.current[p.id];
+        if (prevPrice !== undefined && p.price < prevPrice) {
+          // Check if user is subscribed
+          if (priceAlertSubscriptions.includes(p.id)) {
+            triggerToast(`🔔 Price Drop Alert: "${p.name}" dropped to OMR ${p.price.toFixed(3)} (was OMR ${prevPrice.toFixed(3)})!`);
+          }
+        }
+      });
+    }
+
+    prevPricesRef.current = currentPrices;
+  }, [products, priceAlertSubscriptions]);
+
+  // Toggle Price Drop alert subscription code block
+  const handleTogglePriceAlert = (product: Product) => {
+    setPriceAlertSubscriptions((prev) => {
+      const isSubscribed = prev.includes(product.id);
+      if (isSubscribed) {
+        triggerToast(`🔔 Unsubscribed from price drops for: ${product.name}`);
+        return prev.filter(id => id !== product.id);
+      } else {
+        triggerToast(`🔔 Subscribed! We will notify you of any price drops for: ${product.name}`);
+        return [...prev, product.id];
+      }
+    });
+  };
 
   // Sync to localstorage
   useEffect(() => {
@@ -594,9 +647,11 @@ export default function App() {
                   key={prod.id}
                   product={prod}
                   isWishlisted={wishlist.some(i => i.id === prod.id)}
+                  isPriceAlertSubscribed={priceAlertSubscriptions.includes(prod.id)}
                   onAddToCart={handleAddToCart}
                   onToggleWishlist={handleToggleWishlist}
                   onQuickView={(p) => setQuickViewProduct(p)}
+                  onTogglePriceAlert={handleTogglePriceAlert}
                 />
               ))}
             </div>
@@ -1285,6 +1340,25 @@ export default function App() {
                         </div>
                       )}
                     </div>
+
+                    {/* Notify me of price drops */}
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePriceAlert(quickViewProduct)}
+                      id={`price-alert-modal-${quickViewProduct.id}`}
+                      className={`w-full mt-3 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer ${
+                        priceAlertSubscriptions.includes(quickViewProduct.id)
+                          ? 'bg-amber-500/10 border-amber-300 text-amber-700 hover:bg-amber-500/15 animate-pulse'
+                          : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-950 shadow-xs'
+                      }`}
+                    >
+                      <Bell className={`w-4 h-4 ${priceAlertSubscriptions.includes(quickViewProduct.id) ? 'fill-amber-400 text-amber-500' : ''}`} />
+                      <span>
+                        {priceAlertSubscriptions.includes(quickViewProduct.id)
+                          ? 'Active: Subscribed to Price Drops'
+                          : 'Notify Me of Price Drops'}
+                      </span>
+                    </button>
 
                     {/* Key Specifications List */}
                     <div className="mt-5">
