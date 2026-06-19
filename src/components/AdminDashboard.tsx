@@ -25,7 +25,9 @@ import {
   Tag, 
   Store,
   Upload,
-  Image
+  Image,
+  Zap,
+  Percent
 } from 'lucide-react';
 import { Product, Order } from '../types.ts';
 import { OMAN_GOVERNORATES } from '../data.ts';
@@ -51,7 +53,20 @@ export default function AdminDashboard({
   onAdvanceOrderStatus,
   onTriggerToast,
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'analytics' | 'inventory' | 'orders'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'inventory' | 'orders' | 'promotions'>('analytics');
+
+  // Promotions & Campaign Manager State Variables
+  const [promoCategory, setPromoCategory] = useState<'all' | 'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory'>('all');
+  const [promoDiscountPct, setPromoDiscountPct] = useState<number>(10);
+  const [promoBadge, setPromoBadge] = useState<'sale' | 'hot' | 'best' | '' | 'flash'>('sale');
+
+  const [dealProductId, setDealProductId] = useState<number | ''>('');
+  const [dealDiscountPct, setDealDiscountPct] = useState<number>(20);
+  const [dealBadge, setDealBadge] = useState<'sale' | 'hot' | 'best' | '' | 'flash'>('hot');
+
+  const [flashProductId, setFlashProductId] = useState<number | ''>('');
+  const [flashDiscountPct, setFlashDiscountPct] = useState<number>(30);
+  const [flashDurationHrs, setFlashDurationHrs] = useState<number>(4);
 
   // Inventory forms state
   const [isAddingProduct, setIsAddingProduct] = useState(false);
@@ -210,6 +225,127 @@ export default function AdminDashboard({
     onTriggerToast(`✏️ Updated specs for ${editingProduct.name}.`);
   };
 
+  // 1. Bulk Category-Wide Discount Handler
+  const handleApplyBulkDiscount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (promoDiscountPct < 10 || promoDiscountPct > 100) {
+      onTriggerToast("⚠️ Discount percentage must be between 10% and 100%.");
+      return;
+    }
+
+    let affectedCount = 0;
+    const updatedProducts = products.map((p) => {
+      if (promoCategory === 'all' || p.category === promoCategory) {
+        affectedCount++;
+        const basePrice = p.oldPrice || p.price;
+        const discountedPrice = Number((basePrice * (1 - promoDiscountPct / 100)).toFixed(3));
+        return {
+          ...p,
+          price: discountedPrice,
+          oldPrice: basePrice,
+          badge: (promoBadge as any) || p.badge
+        };
+      }
+      return p;
+    });
+
+    if (affectedCount === 0) {
+      onTriggerToast(`ℹ️ No products to discount found in "${promoCategory}".`);
+      return;
+    }
+
+    onUpdateProducts(updatedProducts);
+    onTriggerToast(`🔥 Applied a ${promoDiscountPct}% automatic discount on all ${affectedCount} ${promoCategory} items!`);
+  };
+
+  // 2. Custom Item-Level Deal Handler
+  const handleApplyProductDeal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (dealProductId === '') {
+      onTriggerToast("⚠️ Please select a product to issue a deal.");
+      return;
+    }
+    if (dealDiscountPct < 10 || dealDiscountPct > 100) {
+      onTriggerToast("⚠️ Discount percentage must be between 10% and 100%.");
+      return;
+    }
+
+    const targetProduct = products.find(p => p.id === Number(dealProductId));
+    if (!targetProduct) return;
+
+    const basePrice = targetProduct.oldPrice || targetProduct.price;
+    const discountedPrice = Number((basePrice * (1 - dealDiscountPct / 100)).toFixed(3));
+
+    const updatedProducts = products.map((p) => {
+      if (p.id === Number(dealProductId)) {
+        return {
+          ...p,
+          price: discountedPrice,
+          oldPrice: basePrice,
+          badge: (dealBadge as any) || p.badge
+        };
+      }
+      return p;
+    });
+
+    onUpdateProducts(updatedProducts);
+    onTriggerToast(`🎯 Custom Deal: ${dealDiscountPct}% off issued on ${targetProduct.name}!`);
+  };
+
+  // 3. Dynamic Flash Deal Handler
+  const handleApplyFlashDeal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (flashProductId === '') {
+      onTriggerToast("⚠️ Please select a target product for the flash deal.");
+      return;
+    }
+    if (flashDiscountPct < 10 || flashDiscountPct > 100) {
+      onTriggerToast("⚠️ Discount percentage must be between 10% and 100%.");
+      return;
+    }
+
+    const targetProduct = products.find(p => p.id === Number(flashProductId));
+    if (!targetProduct) return;
+
+    const basePrice = targetProduct.oldPrice || targetProduct.price;
+    const discountedPrice = Number((basePrice * (1 - flashDiscountPct / 100)).toFixed(3));
+
+    const updatedProducts = products.map((p) => {
+      if (p.id === Number(flashProductId)) {
+        return {
+          ...p,
+          price: discountedPrice,
+          oldPrice: basePrice,
+          badge: 'sale' as any, // standard flash deal badge (sale)
+          description: `⚡ FLASH DEAL (${flashDurationHrs} hrs remaining) - ${targetProduct.description}`
+        };
+      }
+      return p;
+    });
+
+    onUpdateProducts(updatedProducts);
+    onTriggerToast(`⚡ Launched Flash Deal for ${targetProduct.name} at a ${flashDiscountPct}% special discount!`);
+  };
+
+  // 4. Reset All Custom Pricing, campaign, and deal badges
+  const handleResetAllDeals = () => {
+    if (window.confirm("Are you sure you want to stop all active promotional deals, reset compare prices, and restore baseline normal catalog retail prices?")) {
+      const restored = products.map((p) => {
+        if (p.oldPrice) {
+          return {
+            ...p,
+            price: p.oldPrice,
+            oldPrice: undefined,
+            badge: '' as any
+          };
+        }
+        return p;
+      });
+      onUpdateProducts(restored);
+      onTriggerToast("🔄 All catalog pricing restored to default baseline successfully.");
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
       <div className="absolute inset-0 overflow-hidden">
@@ -282,6 +418,16 @@ export default function AdminDashboard({
                   }`}
                 >
                   🚚 Customer Logistics ({orders.length} orders)
+                </button>
+                <button
+                  onClick={() => { setActiveTab('promotions'); setIsAddingProduct(false); setEditingProduct(null); }}
+                  className={`py-4 px-2 border-b-2 transition-all ${
+                    activeTab === 'promotions' 
+                      ? 'border-sky-500 text-sky-400' 
+                      : 'border-transparent text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  ⚡ Promotions & Deals ({products.filter(p => !!p.oldPrice).length} active)
                 </button>
               </div>
 
@@ -779,6 +925,387 @@ export default function AdminDashboard({
                         ))}
                       </div>
                     </div>
+
+                  </div>
+                )}
+
+                {/* 4. PROMOTIONS & DEALS TAB */}
+                {activeTab === 'promotions' && (
+                  <div className="space-y-6 animate-zoom-in">
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-extrabold text-sky-450 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                          <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
+                          Campaign & Promotions Center
+                        </h3>
+                        <p className="text-[11px] text-neutral-500">
+                          Create storewide category-wide discounts, custom item deals, or launch flash timers.
+                        </p>
+                      </div>
+
+                      {products.some(p => !!p.oldPrice) && (
+                        <button
+                          onClick={handleResetAllDeals}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-red-950/40 text-red-400 hover:bg-red-900 hover:text-white border border-red-900/30 font-bold rounded-xl text-xs transition cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Reset All Prices
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Stats summary of current active campaigns */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-850">
+                        <span className="text-[10px] uppercase font-bold text-neutral-500 block">Active Store Discounts</span>
+                        <p className="text-xl font-bold text-white mt-1">
+                          {products.filter(p => !!p.oldPrice).length} / {products.length} Items Marked Down
+                        </p>
+                        <span className="text-[10px] text-neutral-500 block mt-1">
+                          Total savings applied on Oman catalog products
+                        </span>
+                      </div>
+                      
+                      <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-850">
+                        <span className="text-[10px] uppercase font-bold text-neutral-500 block">Flash Deals Live</span>
+                        <p className="text-xl font-bold text-amber-500 mt-1">
+                          {products.filter(p => (p.description && p.description.includes("FLASH DEAL")) || p.badge === 'sale' && p.oldPrice).length} Active Promotional Handles
+                        </p>
+                        <span className="text-[10px] text-neutral-500 block mt-1">
+                          Reflected in customer live storefront page
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Left & Right Grid section of Promotions Controls */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      
+                      {/* Section 1: All Category-Wide Discount */}
+                      <form onSubmit={handleApplyBulkDiscount} className="bg-neutral-950 p-5 rounded-2xl border border-neutral-850 space-y-4 text-xs">
+                        <div className="flex items-center gap-2 border-b border-neutral-850 pb-3 mb-1">
+                          <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center border border-sky-500/20 text-sky-400">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-white text-sm">Bulk Category Markdown (10% to 100%)</h4>
+                            <p className="text-[10px] text-neutral-500">Apply an automatic discount to an entire department at once.</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block mb-1 text-neutral-400 font-bold">Select Category</label>
+                          <select
+                            value={promoCategory}
+                            onChange={(e) => setPromoCategory(e.target.value as any)}
+                            className="w-full bg-neutral-900 border border-neutral-805 rounded-lg p-2.5 focus:outline-none text-white font-bold"
+                          >
+                            <option value="all">All Departments / Categories</option>
+                            <option value="mobile">Smartphones Collection</option>
+                            <option value="laptop">Premium Laptops</option>
+                            <option value="tv">High-Def Televisions</option>
+                            <option value="appliance">Smart Appliances</option>
+                            <option value="accessory">Accessories & Wearables</option>
+                          </select>
+                          <span className="text-[10px] text-neutral-500 mt-1 block">
+                            Matches {promoCategory === 'all' ? products.length : products.filter(p => p.category === promoCategory).length} items currently in stock.
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-neutral-400 font-bold">Discount Percentage</label>
+                            <span className="text-sky-400 font-extrabold font-mono text-xs bg-sky-500/15 px-2 py-0.5 rounded border border-sky-500/20">
+                              {promoDiscountPct}% OFF
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={promoDiscountPct}
+                            onChange={(e) => setPromoDiscountPct(Number(e.target.value))}
+                            className="w-full accent-sky-500 mt-2 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                          />
+                          <div className="flex justify-between text-[9px] text-neutral-550 font-bold mt-1 uppercase">
+                            <span>10% Min</span>
+                            <span>50%</span>
+                            <span>100% Max</span>
+                          </div>
+                          <div className="flex gap-1.5 mt-2 flex-wrap">
+                            {[10, 25, 50, 75, 100].map((v) => (
+                              <button
+                                key={v}
+                                type="button"
+                                onClick={() => setPromoDiscountPct(v)}
+                                className={`px-2 py-1 text-[10px] font-black rounded border transition cursor-pointer ${
+                                  promoDiscountPct === v 
+                                    ? 'bg-sky-500/20 border-sky-500 text-sky-400' 
+                                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                                }`}
+                              >
+                                {v}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block mb-1 text-neutral-400 font-bold">Campaign Promotion Badge</label>
+                          <select
+                            value={promoBadge}
+                            onChange={(e) => setPromoBadge(e.target.value as any)}
+                            className="w-full bg-neutral-900 border border-neutral-805 p-2.5 text-white font-semibold rounded-lg focus:outline-none"
+                          >
+                            <option value="sale">🏷️ Sale Accent</option>
+                            <option value="hot">🔥 Hot Price</option>
+                            <option value="best">👑 Best Choice</option>
+                            <option value="flash">⚡ Flash Deal</option>
+                            <option value="">No Badge Status</option>
+                          </select>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white font-bold rounded-xl hover:shadow-xl transition flex items-center justify-center gap-1.5 cursor-pointer mt-4 text-xs"
+                        >
+                          <Percent className="w-4 h-4" />
+                          Apply Category Campaign
+                        </button>
+                      </form>
+
+                      {/* Section 2: Custom Product Specific Deal */}
+                      <form onSubmit={handleApplyProductDeal} className="bg-neutral-950 p-5 rounded-2xl border border-neutral-850 space-y-4 text-xs">
+                        <div className="flex items-center gap-2 border-b border-neutral-850 pb-3 mb-1">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-400">
+                            <Tag className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-white text-sm">Targeted Product Markdown</h4>
+                            <p className="text-[10px] text-neutral-500">Apply a precise discount deal to a single specific catalog asset.</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block mb-1 text-neutral-400 font-bold">Select Store Asset *</label>
+                          <select
+                            value={dealProductId}
+                            onChange={(e) => setDealProductId(e.target.value === '' ? '' : Number(e.target.value))}
+                            className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2.5 text-white font-medium focus:outline-none"
+                            required
+                          >
+                            <option value="">-- Choose stock item to discount --</option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} ({p.brand}) • OMR {p.price.toFixed(3)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-neutral-400 font-bold">Deal Discount level</label>
+                            <span className="text-emerald-400 font-extrabold font-mono text-xs bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/20">
+                              {dealDiscountPct}% OFF
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={dealDiscountPct}
+                            onChange={(e) => setDealDiscountPct(Number(e.target.value))}
+                            className="w-full accent-emerald-500 mt-2 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                          />
+                          <div className="flex justify-between text-[9px] text-neutral-550 font-bold mt-1 uppercase">
+                            <span>10% Min</span>
+                            <span>50%</span>
+                            <span>100% Max</span>
+                          </div>
+                          <div className="flex gap-1.5 mt-2 flex-wrap">
+                            {[15, 20, 30, 40, 50, 75].map((v) => (
+                              <button
+                                key={v}
+                                type="button"
+                                onClick={() => setDealDiscountPct(v)}
+                                className={`px-2 py-1 text-[10px] font-black rounded border transition cursor-pointer ${
+                                  dealDiscountPct === v 
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                                }`}
+                              >
+                                {v}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block mb-1 text-neutral-400 font-bold">Display Badge Status</label>
+                          <select
+                            value={dealBadge}
+                            onChange={(e) => setDealBadge(e.target.value as any)}
+                            className="w-full bg-neutral-900 border border-neutral-850 p-2.5 text-white font-semibold rounded-lg focus:outline-none"
+                          >
+                            <option value="hot">🔥 Hot Price Highlight</option>
+                            <option value="sale">🏷️ Sale Accent Badge</option>
+                            <option value="best">👑 Best Choice Badge</option>
+                            <option value="flash">⚡ Flash Deal Badge</option>
+                            <option value="">None</option>
+                          </select>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-xl hover:shadow-xl transition flex items-center justify-center gap-1.5 cursor-pointer mt-4 text-xs"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          Publish Item Deal
+                        </button>
+                      </form>
+
+                    </div>
+
+
+                    {/* Section 3: Flash Deals Manager */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      
+                      <form onSubmit={handleApplyFlashDeal} className="bg-neutral-950 p-5 rounded-2xl border border-neutral-850 space-y-4 text-xs">
+                        <div className="flex items-center gap-2 border-b border-neutral-850 pb-3 mb-1">
+                          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-500">
+                            <Zap className="w-4 h-4 animate-bounce" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-white text-sm">Lightning Flash Deal Deployment</h4>
+                            <p className="text-[10px] text-neutral-500">Deploy a high intensity time-locked markdown ticker banner.</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block mb-1 text-neutral-400 font-bold">Select Target Item *</label>
+                            <select
+                              value={flashProductId}
+                              onChange={(e) => setFlashProductId(e.target.value === '' ? '' : Number(e.target.value))}
+                              className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2.5 text-white font-medium focus:outline-none"
+                              required
+                            >
+                              <option value="">-- Choose item --</option>
+                              {products.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block mb-1 text-neutral-400 font-bold">Countdown Clock (Hours)</label>
+                            <select
+                              value={flashDurationHrs}
+                              onChange={(e) => setFlashDurationHrs(Number(e.target.value))}
+                              className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2.5 text-white font-semibold focus:outline-none"
+                            >
+                              <option value={2}>2 Hours (Urgent)</option>
+                              <option value={4}>4 Hours (Standard)</option>
+                              <option value={8}>8 Hours (Half Day)</option>
+                              <option value={12}>12 Hours (Mid-Campaign)</option>
+                              <option value={24}>24 Hours (Full Day Deal)</option>
+                              <option value={48}>48 Hours (Weekend Deal)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-neutral-400 font-bold">Flash Deal Discount Level</label>
+                            <span className="text-amber-400 font-extrabold font-mono text-xs bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/20">
+                              {flashDiscountPct}% OFF
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={flashDiscountPct}
+                            onChange={(e) => setFlashDiscountPct(Number(e.target.value))}
+                            className="w-full accent-amber-500 mt-2 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold rounded-xl hover:shadow-xl transition flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+                        >
+                          <Zap className="w-4 h-4 text-white" />
+                          Launch Live Flash Deal!
+                        </button>
+                      </form>
+
+                      {/* Section 4: Current Markdowns Directory List */}
+                      <div className="bg-neutral-950 p-5 rounded-2xl border border-neutral-850 space-y-4 text-xs">
+                        <div className="flex items-center justify-between border-b border-neutral-850 pb-3 mb-1">
+                          <h4 className="font-bold text-white text-sm">Active Sale Catalog Directory</h4>
+                          <span className="text-[10px] bg-sky-500/15 text-sky-400 border border-sky-500/20 px-2 py-0.5 font-bold rounded">
+                            {products.filter(p => !!p.oldPrice).length} On Sale
+                          </span>
+                        </div>
+
+                        <div className="divide-y divide-neutral-850 max-h-[178px] overflow-y-auto scrollbar-none pr-1">
+                          {products.filter(p => !!p.oldPrice).length === 0 ? (
+                            <div className="text-center py-8 text-neutral-500">
+                              <p className="font-bold">No marked down items active.</p>
+                              <p className="text-[10px] text-neutral-600 mt-0.5 font-medium">Discounts applied using forms above appear here instantly.</p>
+                            </div>
+                          ) : (
+                            products.filter(p => !!p.oldPrice).map((p) => {
+                              const base = p.oldPrice || p.price;
+                              const currentPct = Math.round(((base - p.price) / base) * 100);
+                              return (
+                                <div key={p.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-white block truncate">{p.name}</span>
+                                    <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wide">
+                                      {p.brand} • <span className="text-red-500 text-[11px] font-extrabold">-{currentPct}% off</span>
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-3 shrink-0">
+                                    <div className="text-right">
+                                      <span className="font-extrabold font-mono text-white block">OMR {p.price.toFixed(3)}</span>
+                                      <span className="text-[10px] text-neutral-500 line-through block">OMR {base.toFixed(3)}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        const updated = products.map((item) => {
+                                          if (item.id === p.id) {
+                                            return {
+                                              ...item,
+                                              price: item.oldPrice || item.price,
+                                              oldPrice: undefined,
+                                              badge: '' as any
+                                            };
+                                          }
+                                          return item;
+                                        });
+                                        onUpdateProducts(updated);
+                                        onTriggerToast(`🔄 Reverted retail pricing for ${p.name}`);
+                                      }}
+                                      className="p-1 px-2 border border-neutral-800 rounded bg-neutral-900 hover:bg-neutral-850 hover:text-white font-bold transition text-neutral-400 text-[10px] uppercase cursor-pointer"
+                                      title="Reset this deal"
+                                    >
+                                      Reset
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
 
                   </div>
                 )}
