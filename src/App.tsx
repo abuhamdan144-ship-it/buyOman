@@ -44,6 +44,7 @@ const PRODUCTS_STORAGE_KEY = 'buyoman_products_data';
 export default function App() {
   // Navigation & Category States
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'low-to-high' | 'high-to-low' | 'newest'>('newest');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchOpen, setSearchOpen] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -297,14 +298,25 @@ export default function App() {
   const deliveryFee = cartSubtotal > 20 ? 0 : (cart.length > 0 ? 1.500 : 0);
   const cartTotal = cartSubtotal + deliveryFee;
 
-  // Handle Search Filtering
-  const filteredProducts = products.filter((prod) => {
-    const matchesCategory = selectedCategory === 'all' || prod.category === selectedCategory;
-    const matchesSearch = prod.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          prod.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          prod.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // Handle Search Filtering & Sorting
+  const filteredProducts = products
+    .filter((prod) => {
+      const matchesCategory = selectedCategory === 'all' || prod.category === selectedCategory;
+      const matchesSearch = prod.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            prod.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            prod.description.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'low-to-high') {
+        return a.price - b.price;
+      } else if (sortBy === 'high-to-low') {
+        return b.price - a.price;
+      } else if (sortBy === 'newest') {
+        return b.id - a.id;
+      }
+      return 0;
+    });
 
   // Handle Placing Simulated Order
   const handlePlaceOrder = (e: React.FormEvent) => {
@@ -622,6 +634,27 @@ export default function App() {
                   <span>{tab.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Sub-bar with total count and Sorting Dropdown Menu */}
+          <div id="catalog-controls-bar" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-neutral-100 rounded-3xl px-6 py-4 mb-8">
+            <div className="text-xs font-semibold text-neutral-500">
+              Showing <span className="text-neutral-900 font-extrabold">{filteredProducts.length}</span> premium products in <span className="text-sky-600 font-bold uppercase tracking-wide text-[11px] bg-sky-50 px-2 py-1 rounded-md">{selectedCategory === 'all' ? 'All categories' : selectedCategory}</span>
+            </div>
+
+            <div className="flex items-center gap-2.5 text-xs">
+              <label htmlFor="catalog-sort-select" className="font-bold text-neutral-600 whitespace-nowrap">Sort By:</label>
+              <select
+                id="catalog-sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-neutral-50 border border-neutral-200/80 rounded-xl px-4 py-2 text-neutral-850 font-bold focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 cursor-pointer min-w-[170px] transition-all hover:bg-neutral-100/60"
+              >
+                <option value="newest">🔥 Newest First</option>
+                <option value="low-to-high">📈 Price: Low to High</option>
+                <option value="high-to-low">📉 Price: High to Low</option>
+              </select>
             </div>
           </div>
 
