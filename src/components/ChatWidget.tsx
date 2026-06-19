@@ -52,11 +52,10 @@ const ChatWidget: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(WEBHOOK_URL, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Session-Id': sessionId.current,
         },
         body: JSON.stringify({
           message: messageToSend,
@@ -65,17 +64,17 @@ const ChatWidget: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('✅ Response from n8n:', data);
+      console.log('✅ Response from BuyOman backend proxy:', data);
       
-      const reply = data.reply || data.content || data.message || data.output || "Sorry, I didn't understand. Please contact us at info@buyoman.om";
+      const reply = data.reply || "Sorry, I didn't understand. Please contact us at info@buyoman.om";
       addMessage(reply, 'bot');
     } catch (error) {
       console.error('❌ Chat error:', error);
-      addMessage('❌ Sorry, I\'m having trouble connecting. Please try again later.', 'bot');
+      addMessage('❌ Sorry, we are having trouble connecting to BuyOman. Please try again soon.', 'bot');
     } finally {
       setIsLoading(false);
     }

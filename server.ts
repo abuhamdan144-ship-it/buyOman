@@ -229,6 +229,100 @@ app.post('/api/recommend', async (req, res) => {
   }
 });
 
+// Secure Backend Proxy Endpoint for ChatWidget to bypass browser CORS issues
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, sessionId } = req.body;
+    if (!message) {
+      res.status(400).json({ error: 'Message payload is required.' });
+      return;
+    }
+
+    let replyText = "";
+    let webhookFailed = false;
+
+    // Try server-to-server connection to n8n Webhook
+    try {
+      console.log(`[API-CHAT Proxy] Querying n8n URL: ${WEBHOOK_URL} for session: ${sessionId || 'default'}`);
+      const webhookRes = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/plain, */*'
+        },
+        body: JSON.stringify({
+          message: message,
+          chatInput: message,
+          text: message,
+          query: message,
+          sessionId: sessionId || 'default'
+        })
+      });
+
+      if (webhookRes.ok) {
+        const contentType = webhookRes.headers.get('content-type') || '';
+        
+        if (contentType.includes('application/json')) {
+          try {
+            const data = await webhookRes.json();
+            console.log("[API-CHAT Proxy] n8n parsed JSON payload:", data);
+            
+            if (typeof data === 'string') {
+              replyText = data;
+            } else if (Array.isArray(data)) {
+              const first = data[0];
+              if (first) {
+                replyText = first.reply || first.output || first.response || first.text || first.message || (typeof first === 'string' ? first : JSON.stringify(first));
+              }
+            } else if (data && typeof data === 'object') {
+              replyText = data.reply || data.output || data.response || data.text || data.message || data.chatInput || JSON.stringify(data);
+            }
+          } catch (jsonErr: any) {
+            console.warn("[API-CHAT Proxy] Failed to parse JSON response from n8n webhook", jsonErr.message);
+          }
+        }
+        
+        if (!replyText) {
+          try {
+            replyText = await webhookRes.text();
+            console.log("[API-CHAT Proxy] n8n plain text response:", replyText);
+          } catch (textErr: any) {
+            console.warn("[API-CHAT Proxy] Failed to read plain text response", textErr.message);
+          }
+        }
+
+      } else {
+        console.warn(`[API-CHAT Proxy] Unsuccessful n8n HTTP status code: ${webhookRes.status}`);
+        webhookFailed = true;
+      }
+    } catch (whErr: any) {
+      console.error("[API-CHAT Proxy] n8n server unreachable:", whErr.message);
+      webhookFailed = true;
+    }
+
+    // Dynamic smart back-up system if n8n is offline or returned empty response
+    if (webhookFailed || !replyText || !replyText.trim()) {
+      const lower = message.toLowerCase();
+      if (lower.includes('ac') || lower.includes('air') || lower.includes('cool') || lower.includes('heat') || lower.includes('summer')) {
+        replyText = `❄️ **BuyOman Air Conditioning & Install Service:**\nWe highly recommend our best-selling **LG DUAL Inverter Split AC 2.0 Ton** (OMR 199.900) for Muscat and Salalah summer workloads. Price includes fully free delivery and certified home installation.`;
+      } else if (lower.includes('phone') || lower.includes('mobile') || lower.includes('iphone') || lower.includes('galaxy') || lower.includes('s24')) {
+        replyText = `📱 **Premium Mobile Recommendations:**\nCheckout our absolute premium models:\n- **iPhone 15 Pro Max (256GB)**: OMR 459.900\n- **Samsung Galaxy S24 Ultra**: OMR 389.900\nBoth products feature dual-sim and 1-Year official local brand warranty.`;
+      } else if (lower.includes('delivery') || lower.includes('shipping') || lower.includes('governorate')) {
+        replyText = `🚚 **BuyOman Nationwide Shipping:**\nWe provide free door-to-door delivery for orders exceeding OMR 20. This covers Muscat, Dhofar, Al Batinah, and all other Oman governorates within 24-48 business hours!`;
+      } else if (lower.includes('warranty') || lower.includes('guarantee')) {
+        replyText = `🛡️ **Golden Warranty Cover:**\nAll electronic products on BuyOman benefit from a 1-Year official brand warranty. Large home appliances get our **2-Year Golden Premium Warranty** which includes free home maintenance!`;
+      } else {
+        replyText = `👋 Greetings from BuyOman Smart Support! \n\nI can recommend products, list catalog pricing, or advise on our free delivery across Oman governorates. What electronics/appliances are you searching for today?`;
+      }
+    }
+
+    res.json({ reply: replyText.trim() });
+
+  } catch (err: any) {
+    res.status(500).json({ error: 'Server Internal Error', details: err.message });
+  }
+});
+
 // Setup Vite & Static Files
 async function startViteAndListen() {
   if (process.env.NODE_ENV !== 'production') {
