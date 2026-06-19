@@ -23,7 +23,9 @@ import {
   MapPin, 
   DollarSign, 
   Tag, 
-  Store 
+  Store,
+  Upload,
+  Image
 } from 'lucide-react';
 import { Product, Order } from '../types.ts';
 import { OMAN_GOVERNORATES } from '../data.ts';
@@ -66,6 +68,62 @@ export default function AdminDashboard({
   const [newProdSpecs, setNewProdSpecs] = useState('');
   const [newProdBadge, setNewProdBadge] = useState<'new' | 'sale' | 'hot' | 'best' | ''>('');
 
+  // High quality image upload state representation
+  const [newProdImage, setNewProdImage] = useState<string>(''); // Base64 Data URL string
+  const [isDragging, setIsDragging] = useState(false);
+
+  // File Upload Handlers (Supports both click and drag & drop for listing high quality images)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processUploadedFile(file, isEdit);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent, isEdit: boolean) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    processUploadedFile(file, isEdit);
+  };
+
+  const processUploadedFile = (file: File, isEdit: boolean) => {
+    if (!file.type.startsWith('image/')) {
+      onTriggerToast("❌ Only image files (.jpg, .png, .webp, etc.) are allowed.");
+      return;
+    }
+    // Limit to 4MB to prevent excessive memory burden in local storage
+    if (file.size > 4 * 1024 * 1024) {
+      onTriggerToast("⚠️ Image size exceeds 4MB. Please compress or choose a lighter high-resolution image.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Data = event.target?.result as string;
+      if (isEdit && editingProduct) {
+        setEditingProduct({ ...editingProduct, image: base64Data });
+        onTriggerToast("📷 Specifications image updated.");
+      } else {
+        setNewProdImage(base64Data);
+        onTriggerToast("📷 High quality product design uploaded.");
+      }
+    };
+    reader.onerror = () => {
+      onTriggerToast("❌ Could not process uploaded image file.");
+    };
+    reader.readAsDataURL(file);
+  };
+
   if (!isOpen) return null;
 
   // Analytics helper calculations
@@ -105,7 +163,8 @@ export default function AdminDashboard({
       reviews: 1,
       description: newProdDesc || `${newProdBrand} flagship device tailored with premium specifications.`,
       specs: newProdSpecs ? newProdSpecs.split(',').map(s => s.trim()) : ["Premium Build", "Custom Operations"],
-      badge: newProdBadge ? newProdBadge as any : undefined
+      badge: newProdBadge ? newProdBadge as any : undefined,
+      image: newProdImage || undefined
     };
 
     onUpdateProducts([newProd, ...products]);
@@ -127,6 +186,8 @@ export default function AdminDashboard({
     setNewProdDesc('');
     setNewProdSpecs('');
     setNewProdBadge('');
+    setNewProdImage('');
+    setIsDragging(false);
   };
 
   // Handle product deletes
@@ -460,6 +521,71 @@ export default function AdminDashboard({
                           </select>
                         </div>
 
+                        {/* High Quality Image Upload Drag & Drop Area */}
+                        <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800/80 space-y-2">
+                          <label className="block text-xs font-bold text-neutral-300 uppercase tracking-widest flex items-center gap-1.5">
+                            <Image className="w-4 h-4 text-sky-400" />
+                            <span>High-Resolution Product Picture</span>
+                            <span className="text-[9px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded uppercase font-extrabold tracking-wider">High Quality Optional</span>
+                          </label>
+                          <p className="text-[10px] text-neutral-400 leading-tight">
+                            Enhance your store item card by dropping a pristine photograph. This will override the standard category emoji visual automatically.
+                          </p>
+
+                          <div 
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, false)}
+                            className={`relative h-28 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition px-4 py-3 text-center cursor-pointer ${
+                              isDragging 
+                                ? 'border-sky-500 bg-sky-500/10 text-sky-400' 
+                                : newProdImage 
+                                  ? 'border-emerald-500/55 bg-emerald-500/5' 
+                                  : 'border-neutral-800 hover:border-neutral-700 bg-neutral-900/40 text-neutral-400'
+                            }`}
+                          >
+                            <input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={(e) => handleFileChange(e, false)}
+                              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                            />
+                            
+                            {newProdImage ? (
+                              <div className="flex items-center gap-4 w-full h-full justify-center relative z-20">
+                                <div className="h-20 w-20 rounded-lg bg-neutral-950 p-1 border border-neutral-800 flex items-center justify-center shrink-0">
+                                  <img 
+                                    src={newProdImage} 
+                                    alt="Preview" 
+                                    className="max-h-full max-w-full object-contain rounded-sm"
+                                  />
+                                </div>
+                                <div className="text-left">
+                                  <span className="text-xs font-bold text-emerald-400 block flex items-center gap-1">✓ Device Photo Loaded</span>
+                                  <p className="text-[10px] text-neutral-400 mt-0.5">High definition base64 state is ready.</p>
+                                  <button 
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setNewProdImage('');
+                                    }}
+                                    className="text-[10px] text-red-500 font-extrabold tracking-wider uppercase hover:underline mt-1.5 bg-transparent block relative z-30"
+                                  >
+                                    Remove Attachment
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <Upload className="w-6 h-6 mb-1 text-sky-450 animate-pulse" />
+                                <span className="text-xs font-bold text-white block">Drop high-quality visual, or click to browse</span>
+                                <span className="text-[10px] text-neutral-500 block mt-0.5">Supports PNG, WebP, JPEG • max 4MB</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
                         <div>
                           <label className="block mb-1 text-neutral-400">Detailed Catalog Description</label>
                           <textarea
@@ -521,6 +647,69 @@ export default function AdminDashboard({
                           </div>
                         </div>
 
+                        {/* High Quality Image Upload Edit state */}
+                        <div className="bg-neutral-900/60 p-4 rounded-xl border border-neutral-800 space-y-2">
+                          <label className="block text-xs font-bold text-neutral-300 uppercase tracking-widest flex items-center gap-1.5">
+                            <Image className="w-4 h-4 text-amber-500" />
+                            <span>Modify Product Image</span>
+                          </label>
+                          <p className="text-[10px] text-neutral-400 leading-tight">
+                            Replace or add a high-resolution file to override the default category emoji indicator.
+                          </p>
+
+                          <div 
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, true)}
+                            className={`relative h-24 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition px-4 py-2 text-center cursor-pointer ${
+                              isDragging 
+                                ? 'border-amber-500 bg-amber-500/10 text-amber-400' 
+                                : editingProduct.image 
+                                  ? 'border-emerald-500/50 bg-emerald-500/5' 
+                                  : 'border-neutral-850 hover:border-neutral-700 bg-neutral-900/40 text-neutral-400'
+                            }`}
+                          >
+                            <input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={(e) => handleFileChange(e, true)}
+                              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                            />
+                            
+                            {editingProduct.image ? (
+                              <div className="flex items-center gap-4 w-full h-full justify-center relative z-20">
+                                <div className="h-16 w-16 rounded-lg bg-neutral-950 p-1 border border-neutral-800 flex items-center justify-center shrink-0">
+                                  <img 
+                                    src={editingProduct.image} 
+                                    alt="Preview" 
+                                    className="max-h-full max-w-full object-contain rounded-sm"
+                                  />
+                                </div>
+                                <div className="text-left w-full max-w-xs">
+                                  <span className="text-[11px] font-bold text-emerald-400 block flex items-center gap-1 flex-wrap">✓ Active Picture Loaded</span>
+                                  <button 
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setEditingProduct({ ...editingProduct, image: undefined });
+                                    }}
+                                    className="text-[10px] text-red-550 hover:text-red-500 font-extrabold tracking-wider uppercase hover:underline mt-1 bg-transparent block relative z-30"
+                                  >
+                                    Reset to Category Emoji
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <Upload className="w-5 h-5 mb-1 text-amber-500 animate-pulse" />
+                                <span className="text-xs font-bold text-white block">Drop replacement visual, or click to browse</span>
+                                <span className="text-[9px] text-neutral-500 block mt-0.5">Supports PNG, WebP, JPEG • max 4MB</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="flex justify-end gap-3 pt-2">
                           <button
                             type="button"
@@ -549,7 +738,13 @@ export default function AdminDashboard({
                         {products.map((p) => (
                           <div key={p.id} className="p-4 flex items-center justify-between gap-4 hover:bg-neutral-900/50 transition">
                             <div className="flex items-center gap-3">
-                              <span className="text-3xl select-none">{p.emoji}</span>
+                              <div className="w-10 h-10 bg-neutral-800 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border border-neutral-700/60 p-0.5">
+                                {p.image ? (
+                                  <img src={p.image} alt={p.name} className="max-h-full max-w-full object-contain select-none" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span className="text-2xl select-none">{p.emoji}</span>
+                                )}
+                              </div>
                               <div>
                                 <h4 className="font-bold text-white text-sm">{p.name}</h4>
                                 <p className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">{p.brand} • <span className="text-neutral-500">{p.category}</span></p>

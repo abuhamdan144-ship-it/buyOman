@@ -1005,8 +1005,12 @@ export default function App() {
                         <div key={item.product.id} className="py-4 flex items-center gap-4">
                           
                           {/* Image Emoji block */}
-                          <div className="w-16 h-16 bg-neutral-50 rounded-xl flex items-center justify-center text-3xl select-none shrink-0 border border-neutral-100">
-                            {item.product.emoji}
+                          <div className="w-16 h-16 bg-neutral-50 rounded-xl flex items-center justify-center overflow-hidden shrink-0 border border-neutral-100 p-1 bg-white">
+                            {item.product.image ? (
+                              <img src={item.product.image} alt={item.product.name} className="max-h-12 max-w-full object-contain select-none" referrerPolicy="no-referrer" />
+                            ) : (
+                              <span className="text-3xl select-none">{item.product.emoji}</span>
+                            )}
                           </div>
 
                           <div className="flex-1 min-w-0">
@@ -1142,7 +1146,13 @@ export default function App() {
                       wishlist.map((item) => (
                         <div key={item.id} className="py-4 flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3">
-                            <span className="text-3xl bg-neutral-50 p-2.5 rounded-lg border border-neutral-100 select-none block shrink-0">{item.emoji}</span>
+                            <span className="w-14 h-14 bg-neutral-50 border border-neutral-100 p-1 bg-white rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+                              {item.image ? (
+                                <img src={item.image} alt={item.name} className="max-h-11 max-w-full object-contain select-none" referrerPolicy="no-referrer" />
+                              ) : (
+                                <span className="text-2xl select-none">{item.emoji}</span>
+                              )}
+                            </span>
                             <div>
                               <h4 className="text-xs font-bold text-neutral-800 line-clamp-1">{item.name}</h4>
                               <p className="text-[10px] text-neutral-400 uppercase font-bold">{item.brand}</p>
@@ -1217,10 +1227,16 @@ export default function App() {
 
                 <div className="sm:flex sm:items-start gap-8">
                   
-                  {/* Left Side big Emoji graphic */}
-                  <div className="w-32 h-32 sm:w-44 sm:h-44 bg-neutral-50 rounded-2xl flex items-center justify-center text-7xl sm:text-8xl select-none mx-auto border border-neutral-100 shrink-0 mb-6 sm:mb-0 relative shadow-sm">
-                    {quickViewProduct.emoji}
-                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3/4 h-2 bg-black/5 blur-md rounded-full"></div>
+                  {/* Left Side big Image or Emoji graphic */}
+                  <div className="w-32 h-32 sm:w-44 sm:h-44 bg-neutral-50 rounded-2xl flex items-center justify-center overflow-hidden p-4 select-none mx-auto border border-neutral-100 shrink-0 mb-6 sm:mb-0 relative shadow-sm bg-white">
+                    {quickViewProduct.image ? (
+                      <img src={quickViewProduct.image} alt={quickViewProduct.name} className="max-h-full max-w-full object-contain select-none" referrerPolicy="no-referrer" />
+                    ) : (
+                      <>
+                        <span className="text-7xl sm:text-8xl select-none">{quickViewProduct.emoji}</span>
+                        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3/4 h-2 bg-black/5 blur-md rounded-full"></div>
+                      </>
+                    )}
                   </div>
 
                   {/* Right Side Info */}

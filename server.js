@@ -64,6 +64,7 @@ const productSchema = new mongoose.Schema({
   category: { type: String, required: true },
   description: { type: String, default: '' },
   specs: { type: [String], default: [] },
+  image: { type: String },
   featured: { type: Boolean, default: false }
 }, {
   timestamps: true // Auto-appends createdAt and updatedAt
@@ -467,7 +468,7 @@ app.get('/api/products/:id', async (req, res) => {
 // POST - ADD NEW PRODUCT
 app.post('/api/products', async (req, res) => {
   try {
-    const { name, brand, emoji, price, oldPrice, category, description, specs, badge, rating, reviews, featured } = req.body;
+    const { name, brand, emoji, price, oldPrice, category, description, specs, badge, rating, reviews, featured, image } = req.body;
     
     // Validations
     if (!name || !brand || price === undefined || !category) {
@@ -493,7 +494,8 @@ app.post('/api/products', async (req, res) => {
       badge: badge || '',
       rating: rating || 5.0,
       reviews: reviews || 0,
-      featured: !!featured
+      featured: !!featured,
+      image: image || undefined
     });
 
     const saved = await newProduct.save();

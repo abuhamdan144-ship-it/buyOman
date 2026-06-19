@@ -299,8 +299,12 @@ export default function OrderHistory({
                                   {order.items.map((item, idx) => (
                                     <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-xl border border-neutral-100 hover:border-neutral-200 transition">
                                       <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center text-xl shrink-0">
-                                          {item.product.emoji}
+                                        <div className="w-10 h-10 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center overflow-hidden shrink-0 p-0.5 bg-white">
+                                          {item.product.image ? (
+                                            <img src={item.product.image} alt={item.product.name} className="max-h-full max-w-full object-contain select-none" referrerPolicy="no-referrer" />
+                                          ) : (
+                                            <span className="text-xl select-none">{item.product.emoji}</span>
+                                          )}
                                         </div>
                                         <div>
                                           <h4 className="text-xs font-bold text-neutral-800 line-clamp-1">{item.product.name}</h4>

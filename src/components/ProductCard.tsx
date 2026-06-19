@@ -69,12 +69,21 @@ export default function ProductCard({
         />
       </button>
 
-      {/* Image Block: Centered Emoji with ambient color */}
-      <div className="h-48 bg-neutral-50/70 py-6 overflow-hidden flex items-center justify-center relative cursor-zoom-in" onClick={() => onQuickView(product)}>
-        <div className="text-7xl group-hover:scale-110 transition-transform duration-500 select-none pb-4 relative">
-          {product.emoji}
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4/5 h-2 bg-black/5 blur-md rounded-full"></div>
-        </div>
+      {/* Image Block: Centered high quality Image or Emoji fallback with ambient color */}
+      <div className="h-48 bg-neutral-50/70 py-4 px-4 overflow-hidden flex items-center justify-center relative cursor-zoom-in" onClick={() => onQuickView(product)}>
+        {product.image ? (
+          <img 
+            src={product.image} 
+            alt={product.name} 
+            className="max-h-40 max-w-full object-contain group-hover:scale-105 transition-transform duration-500 select-none"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="text-7xl group-hover:scale-110 transition-transform duration-500 select-none pb-4 relative">
+            {product.emoji}
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4/5 h-2 bg-black/5 blur-md rounded-full"></div>
+          </div>
+        )}
         
         {/* Interactive Overlay */}
         <div className="absolute inset-0 bg-neutral-900/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">

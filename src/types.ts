@@ -16,6 +16,7 @@ export interface Product {
   category: 'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory';
   description: string;
   specs: string[];
+  image?: string; // High quality uploaded image (Base64 string)
 }
 
 export interface CartItem {
