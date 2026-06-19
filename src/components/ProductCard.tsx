@@ -120,7 +120,8 @@ export default function ProductCard({
           <img 
             src={product.image} 
             alt={product.name} 
-            className="max-h-40 max-w-full object-contain group-hover:scale-105 transition-transform duration-500 select-none"
+            loading="lazy"
+            className="max-h-40 max-w-full object-contain group-hover:scale-110 transition-transform duration-700 ease-out select-none"
             referrerPolicy="no-referrer"
           />
         ) : (
