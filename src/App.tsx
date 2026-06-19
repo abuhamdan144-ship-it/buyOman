@@ -37,6 +37,7 @@ import ProductCard from './components/ProductCard.tsx';
 import OrderHistory from './components/OrderHistory.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import ReviewsSection from './components/ReviewsSection.tsx';
+import ChatWidget from './components/ChatWidget.tsx';
 
 // Persistent storage keys
 const CART_STORAGE_KEY = 'buyoman_cart_data';
@@ -3112,6 +3113,9 @@ export default function App() {
           </div>
         </div>
       )}
+      
+      {/* Floating Modern Chatbot Widget */}
+      <ChatWidget />
 
     </div>
   );

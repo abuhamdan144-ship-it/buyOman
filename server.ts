@@ -83,6 +83,8 @@ app.post('/api/recommend', async (req, res) => {
       return;
     }
 
+    let webhookErrorBanner = "";
+
     // Try n8n Webhook as requested by user
     try {
       console.log(`Connecting to chat bot custom n8n Webhook: ${WEBHOOK_URL}`);
@@ -96,6 +98,7 @@ app.post('/api/recommend', async (req, res) => {
           message: message,
           chatInput: message,
           text: message,
+          query: message,
           history: history || []
         })
       });
@@ -105,33 +108,53 @@ app.post('/api/recommend', async (req, res) => {
         let replyText = "";
 
         if (contentType.includes('application/json')) {
-          const data = await webhookRes.json();
-          console.log("n8n Webhook JSON response:", data);
-          
-          if (typeof data === 'string') {
-            replyText = data;
-          } else if (Array.isArray(data)) {
-            const first = data[0];
-            if (first) {
-              replyText = first.output || first.response || first.reply || first.text || first.message || (typeof first === 'string' ? first : JSON.stringify(first));
+          try {
+            const data = await webhookRes.json();
+            console.log("n8n Webhook JSON response:", data);
+            
+            if (typeof data === 'string') {
+              replyText = data;
+            } else if (Array.isArray(data)) {
+              const first = data[0];
+              if (first) {
+                replyText = first.output || first.response || first.reply || first.text || first.message || (typeof first === 'string' ? first : JSON.stringify(first));
+              }
+            } else if (data && typeof data === 'object') {
+              replyText = data.output || data.response || data.reply || data.text || data.message || data.chatInput || JSON.stringify(data);
             }
-          } else if (data && typeof data === 'object') {
-            replyText = data.output || data.response || data.reply || data.text || data.message || data.chatInput || JSON.stringify(data);
+          } catch (jsonErr: any) {
+            console.warn("Failed to parse JSON response from n8n webhook", jsonErr.message);
           }
-        } else {
-          replyText = await webhookRes.text();
-          console.log("n8n Webhook Plain text response:", replyText);
+        }
+        
+        if (!replyText) {
+          try {
+            replyText = await webhookRes.text();
+            console.log("n8n Webhook text response:", replyText);
+          } catch (textErr: any) {
+            console.warn("Failed to read text from n8n webhook response", textErr.message);
+          }
         }
 
         if (replyText && typeof replyText === 'string' && replyText.trim()) {
           res.json({ reply: replyText.trim() });
           return;
+        } else {
+          webhookErrorBanner = `⚠️ **n8n Webhook Empty Payload Alert:**\nReceived an empty reply text or unable to extract message field from your n8n workflow output (HTTP ${webhookRes.status}).`;
         }
       } else {
-        console.warn(`n8n Webhook response code: ${webhookRes.status}. Proceeding to secondary Gemini helper.`);
+        let errBody = "";
+        try {
+          errBody = await webhookRes.text();
+        } catch {
+          errBody = "[Unreadable response body]";
+        }
+        console.warn(`n8n Webhook response code: ${webhookRes.status}.`);
+        webhookErrorBanner = `⚠️ **n8n Webhook Connection Error:**\nThe webhook at URL \`${WEBHOOK_URL}\` returned an error status code: **${webhookRes.status} ${webhookRes.statusText || ''}**.\n\n* **Response Body from your n8n server:**\n\`\`\`\n${errBody.slice(0, 300) || '[No response body]'}\n\`\`\``;
       }
     } catch (whErr: any) {
-      console.warn("Failed sending payload to n8n webhook, using secondary Gemini service.", whErr.message);
+      console.warn("Failed sending payload to n8n webhook.", whErr.message);
+      webhookErrorBanner = `⚠️ **n8n Webhook Offline/Unreachable:**\nFailed to establish connection to n8n webhook at \`${WEBHOOK_URL}\`.\n\n* **Network Error Detail:** \`${whErr.message || whErr}\`\n* Please verify that your n8n workflow is active, listening to POST payloads, and has no CORS/network firewall blocks.`;
     }
 
     // Secondary fallback: Gemini API or Local structured mock guidelines
@@ -164,7 +187,10 @@ app.post('/api/recommend', async (req, res) => {
         }
       });
 
-      const replyText = response.text || "I apologize, I could not generate a recommendation right now. How else can I assist you with BuyOman's appliances?";
+      let replyText = response.text || "I apologize, I could not generate a recommendation right now. How else can I assist you with BuyOman's appliances?";
+      if (webhookErrorBanner) {
+        replyText = `${webhookErrorBanner}\n\n---\n\n💡 **Fallback Assistant Response:**\n\n${replyText}`;
+      }
       res.json({ reply: replyText });
 
     } catch (apiError: any) {
@@ -185,7 +211,11 @@ app.post('/api/recommend', async (req, res) => {
       } else {
         replyText = `### Hello from BuyOman AI Support! 🇴🇲\n\nWelcome to BuyOman! I am your smart shopping advisor. I can help you find suitable appliances or electronics tailored for your needs and Omani home sizes.\n\n**How to Ask me:**\n* "Which AC is best for hot Omani summers?"\n* "Can you recommend a premium smartphone under OMR 400?"\n* "What large washing machines do you recommend for a family of 5?"\n* "Suggest a good coffee maker or air fryer."\n\nTell me what you are looking for, or your budget in OMR!`;
       }
-      
+
+      if (webhookErrorBanner) {
+        replyText = `${webhookErrorBanner}\n\n---\n\n💡 **Fallback Assistant Response:**\n\n${replyText}`;
+      }
+
       // Let the client know it is fallback response but still highly comprehensive
       res.json({ 
         reply: replyText,
