@@ -260,12 +260,20 @@ app.post('/api/chat', async (req, res) => {
       });
 
       if (webhookRes.ok) {
-        const contentType = webhookRes.headers.get('content-type') || '';
-        
-        if (contentType.includes('application/json')) {
+        let rawText = "";
+        try {
+          rawText = await webhookRes.text();
+          console.log("[API-CHAT Proxy] Raw response from n8n webhook:", rawText);
+        } catch (readErr: any) {
+          console.warn("[API-CHAT Proxy] Failed to read response body text:", readErr.message);
+        }
+
+        const trimmed = (rawText || "").trim();
+        if (trimmed) {
           try {
-            const data = await webhookRes.json();
-            console.log("[API-CHAT Proxy] n8n parsed JSON payload:", data);
+            // Attempt to parse as JSON first
+            const data = JSON.parse(trimmed);
+            console.log("[API-CHAT Proxy] Parsed JSON payload successfully:", data);
             
             if (typeof data === 'string') {
               replyText = data;
@@ -278,16 +286,9 @@ app.post('/api/chat', async (req, res) => {
               replyText = data.reply || data.output || data.response || data.text || data.message || data.chatInput || JSON.stringify(data);
             }
           } catch (jsonErr: any) {
-            console.warn("[API-CHAT Proxy] Failed to parse JSON response from n8n webhook", jsonErr.message);
-          }
-        }
-        
-        if (!replyText) {
-          try {
-            replyText = await webhookRes.text();
-            console.log("[API-CHAT Proxy] n8n plain text response:", replyText);
-          } catch (textErr: any) {
-            console.warn("[API-CHAT Proxy] Failed to read plain text response", textErr.message);
+            // Treat as plain text if JSON parsing fails
+            console.log("[API-CHAT Proxy] Response is not valid JSON, treating as plain text.");
+            replyText = trimmed;
           }
         }
 
