@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShoppingBag, 
+  ShoppingCart,
   Heart, 
   Trash2, 
   Plus, 
@@ -25,7 +26,8 @@ import {
   MapPin, 
   Send,
   Sparkle,
-  Bell
+  Bell,
+  GitCompare
 } from 'lucide-react';
 import { PRODUCTS_DATA, SMALL_APPLIANCES, OMAN_GOVERNORATES } from './data.ts';
 import { Product, CartItem, BillingInfo, Order, Message } from './types.ts';
@@ -40,6 +42,43 @@ const CART_STORAGE_KEY = 'buyoman_cart_data';
 const WISHLIST_STORAGE_KEY = 'buyoman_wishlist_data';
 const ORDERS_STORAGE_KEY = 'buyoman_orders_data';
 const PRODUCTS_STORAGE_KEY = 'buyoman_products_data';
+
+// Helper function to extract relevant key hardware specifications dynamically for comparison layout
+const getSpecDetail = (product: Product, type: 'performance' | 'display' | 'battery' | 'camera_audio' | 'extra') => {
+  const specs = product.specs || [];
+  let kw: string[] = [];
+  if (type === 'performance') {
+    kw = ['chip', 'processor', 'snapdragon', 'bionic', 'm3', 'intel', 'ryzen', 'memory', 'ram', 'inverter', 'gb'];
+  } else if (type === 'display') {
+    kw = ['inch', 'screen', 'display', 'retina', 'amoled', 'oled', 'hz', 'led', 'resolution', 'px', 'panel'];
+  } else if (type === 'battery') {
+    kw = ['battery', 'mah', 'hours', 'hour', 'charge', 'power', 'cooling', 'saving', 'energy'];
+  } else if (type === 'camera_audio') {
+    kw = ['camera', 'mp', 'lens', 'sensor', 'zoom', 'audio', 'sound', 'microphone', 'optical', 'leica'];
+  } else if (type === 'extra') {
+    kw = ['design', 'titanium', 's pen', 'waterproof', 'port', 'finish', 'hub', 'anti-reflection', 'compressor', 'shield', 'structure', 'tested', 'refresh', 'dolby'];
+  }
+
+  // Find first spec mapping any keyword
+  const matched = specs.find(spec => kw.some(k => spec.toLowerCase().includes(k.toLowerCase())));
+  if (matched) return matched;
+
+  // Fallback: search description for these keywords or grab generic item
+  if (type === 'performance') {
+    const fromDesc = product.description.split('.').find(s => ['chip', 'processor', 'inverter', 'snapdragon'].some(k => s.toLowerCase().includes(k.toLowerCase())));
+    if (fromDesc) return fromDesc.trim();
+  } else if (type === 'battery') {
+    const fromDesc = product.description.split('.').find(s => ['battery', 'charge', 'energy', 'save'].some(k => s.toLowerCase().includes(k.toLowerCase())));
+    if (fromDesc) return fromDesc.trim();
+  }
+
+  // Default fallback index
+  if (type === 'performance' && specs[1]) return specs[1];
+  if (type === 'display' && specs[2]) return specs[2];
+  if (type === 'battery' && specs[3]) return specs[3];
+  if (type === 'camera_audio' && specs[4]) return specs[4];
+  return specs[0] || "Standard Specification Verified";
+};
 
 export default function App() {
   // Navigation & Category States
@@ -74,6 +113,10 @@ export default function App() {
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState<boolean>(false);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
+
+  // Product Comparison States
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const [compareModalOpen, setCompareModalOpen] = useState<boolean>(false);
 
   // AI Advisor Chat Drawer State
   const [advisorOpen, setAdvisorOpen] = useState<boolean>(false);
@@ -195,6 +238,24 @@ export default function App() {
         return prev.filter(id => id !== product.id);
       } else {
         triggerToast(`🔔 Subscribed! We will notify you of any price drops for: ${product.name}`);
+        return [...prev, product.id];
+      }
+    });
+  };
+
+  // Toggle dynamic comparison slot of specific product asset
+  const handleToggleCompare = (product: Product) => {
+    setCompareIds((prev) => {
+      const isComparing = prev.includes(product.id);
+      if (isComparing) {
+        triggerToast(`⚖️ Removed "${product.name}" from comparison list.`);
+        return prev.filter(id => id !== product.id);
+      } else {
+        if (prev.length >= 3) {
+          triggerToast("⚠️ High Contrast limit: You can only compare up to 3 products simultaneously.");
+          return prev;
+        }
+        triggerToast(`⚖️ Added "${product.name}" to comparison list. See the tray below!`);
         return [...prev, product.id];
       }
     });
@@ -681,10 +742,12 @@ export default function App() {
                   product={prod}
                   isWishlisted={wishlist.some(i => i.id === prod.id)}
                   isPriceAlertSubscribed={priceAlertSubscriptions.includes(prod.id)}
+                  isComparing={compareIds.includes(prod.id)}
                   onAddToCart={handleAddToCart}
                   onToggleWishlist={handleToggleWishlist}
                   onQuickView={(p) => setQuickViewProduct(p)}
                   onTogglePriceAlert={handleTogglePriceAlert}
+                  onToggleCompare={handleToggleCompare}
                 />
               ))}
             </div>
@@ -1393,6 +1456,25 @@ export default function App() {
                       </span>
                     </button>
 
+                    {/* Compare side-by-side specs */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCompare(quickViewProduct)}
+                      id={`compare-modal-${quickViewProduct.id}`}
+                      className={`w-full mt-2.5 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer ${
+                        compareIds.includes(quickViewProduct.id)
+                          ? 'bg-sky-500/10 border-sky-300 text-sky-700 hover:bg-sky-500/15'
+                          : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-950 shadow-xs'
+                      }`}
+                    >
+                      <GitCompare className={`w-4 h-4 ${compareIds.includes(quickViewProduct.id) ? 'text-sky-500' : ''}`} />
+                      <span>
+                        {compareIds.includes(quickViewProduct.id)
+                          ? 'Active: Subscribed to Side-by-Side Comparison'
+                          : 'Compare Side-by-Side (Select up to 3)'}
+                      </span>
+                    </button>
+
                     {/* Key Specifications List */}
                     <div className="mt-5">
                       <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider mb-2.5">Detailed Features & Hardware</h4>
@@ -1787,6 +1869,346 @@ export default function App() {
         onAdvanceOrderStatus={handleAdvanceShipment}
         onTriggerToast={triggerToast}
       />
+
+      {/* ========================================= */}
+      {/* FLOATING ACTION BAR: COMPARISON TRAY */}
+      {/* ========================================= */}
+      {compareIds.length > 0 && (
+        <div 
+          id="product-comparison-tray"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-neutral-200/80 p-3.5 flex flex-col sm:flex-row items-center gap-4 justify-between max-w-3xl w-[92%] animate-in fade-in slide-in-from-bottom-2 duration-300"
+        >
+          <div className="flex items-center gap-3.5 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-none">
+            <span className="text-xs font-black text-neutral-805 flex items-center gap-1.5 shrink-0 bg-neutral-100 px-2.5 py-1.5 rounded-lg border border-neutral-200/50">
+              <GitCompare className="w-4 h-4 text-sky-600 animate-pulse bg-white p-0.5 rounded-full" />
+              <span>Comparing ({compareIds.length}/3)</span>
+            </span>
+
+            <div className="flex items-center gap-2">
+              {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                <div 
+                  key={p.id}
+                  className="flex items-center gap-1.5 bg-sky-50 border border-sky-100 rounded-lg py-1 pl-2 pr-1.5 text-xs font-bold text-neutral-800 transition shrink-0"
+                >
+                  <span className="text-base select-none">{p.emoji}</span>
+                  <span className="truncate max-w-[100px] sm:max-w-[140px] text-[11px] font-extrabold text-sky-900">{p.name}</span>
+                  <button
+                    onClick={() => handleToggleCompare(p)}
+                    className="p-0.5 rounded-full text-sky-400 hover:text-sky-700 hover:bg-sky-100 transition cursor-pointer"
+                    title="Remove item"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                setCompareIds([]);
+                triggerToast('⚖️ Cleared all compare selections.');
+              }}
+              className="flex-1 sm:flex-initial py-2 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xl text-xs font-extrabold transition cursor-pointer"
+            >
+              Clear All
+            </button>
+            <button
+              onClick={() => setCompareModalOpen(true)}
+              className="flex-1 sm:flex-initial py-2 px-5 bg-sky-700 hover:bg-sky-850 text-white rounded-xl text-xs font-extrabold shadow-md hover:shadow-lg transition flex items-center gap-1.5 justify-center cursor-pointer animate-brightness"
+            >
+              <span>Compare side-by-side</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================= */}
+      {/* MODAL: COMPARISON SIDE-BY-SIDE MATRIX */}
+      {/* ========================================= */}
+      {compareModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+          <div className="flex min-h-screen items-center justify-center p-4 text-center sm:p-6 md:p-10">
+            
+            {/* Backdrop overlay */}
+            <div className="fixed inset-0 bg-neutral-900/60 transition-opacity backdrop-blur-xs" onClick={() => setCompareModalOpen(false)}></div>
+            
+            {/* Modal Body wrapper */}
+            <div className="relative inline-block w-full max-w-5xl transform overflow-hidden rounded-3xl bg-white text-left align-middle shadow-2xl transition-all animate-zoom-in border border-neutral-105 flex flex-col my-8">
+              
+              {/* Header */}
+              <div className="bg-white px-6 py-5 border-b border-neutral-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-neutral-900 flex items-center gap-2">
+                    <span className="p-1 px-2 bg-sky-50 text-sky-600 font-extrabold rounded-md text-xs">⚖️ Compare</span>
+                    <span>Specifications Comparison Matrix</span>
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-1">Comparing {compareIds.length} premium products. Use our tool to decide features, processors, and hardware side-by-side.</p>
+                </div>
+                <button
+                  onClick={() => setCompareModalOpen(false)}
+                  className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition cursor-pointer"
+                  title="Close Comparison"
+                >
+                  <X className="w-5.5 h-5.5" />
+                </button>
+              </div>
+
+              {/* Table / Grid Content */}
+              <div className="px-6 py-6 overflow-x-auto">
+                {products.filter(p => compareIds.includes(p.id)).length === 0 ? (
+                  <div className="text-center py-12">
+                    <span className="text-4xl block mb-2">⚖️</span>
+                    <h5 className="text-sm font-bold text-neutral-700">No products configured for comparison.</h5>
+                    <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">Click the GitCompare circle button on any product card in the catalog to add items side-by-side.</p>
+                    <button
+                      onClick={() => setCompareModalOpen(false)}
+                      className="mt-4 px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-bold"
+                    >
+                      Browse Catalog
+                    </button>
+                  </div>
+                ) : (
+                  <div className="min-w-[650px]">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b border-neutral-100 bg-neutral-50/50">
+                          <th className="w-[180px] p-4 text-left text-xs font-bold text-neutral-400 uppercase tracking-widest leading-loose">
+                            Product Attributes
+                          </th>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <th key={p.id} className="p-4 text-left font-bold text-neutral-900 relative">
+                              <button
+                                onClick={() => handleToggleCompare(p)}
+                                className="absolute top-2 right-2 p-1 text-neutral-400 hover:text-red-500 hover:bg-neutral-100 rounded-full transition cursor-pointer"
+                                title="Remove from comparison"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                              <div className="flex flex-col items-center text-center pt-2">
+                                <div className="w-16 h-16 bg-neutral-50 rounded-2xl flex items-center justify-center text-3xl mb-3 shadow-xs select-none border border-neutral-100 bg-white">
+                                  {p.image ? (
+                                    <img src={p.image} alt={p.name} className="max-h-12 max-w-full object-contain" />
+                                  ) : p.emoji}
+                                </div>
+                                <span className="text-[10px] uppercase font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full inline-block mb-1">
+                                  {p.brand}
+                                </span>
+                                <h4 className="text-xs font-black text-neutral-900 leading-snug line-clamp-1 max-w-[180px]">
+                                  {p.name}
+                                </h4>
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Rating Row */}
+                        <tr className="border-b border-neutral-100 hover:bg-neutral-50/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Consumer Rating
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs">
+                              <div className="flex items-center gap-1.5 font-bold text-neutral-800">
+                                <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                                <span>{p.rating} / 5.0</span>
+                                <span className="text-[10px] text-neutral-400 font-medium">({p.reviews} reviews)</span>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* Price point */}
+                        <tr className="border-b border-neutral-100 bg-neutral-50/20 hover:bg-neutral-100/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Price & Saving
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-extrabold text-neutral-900">
+                                  OMR {p.price.toFixed(3)}
+                                </span>
+                                {p.oldPrice && (
+                                  <span className="text-[10px] text-neutral-400 line-through">
+                                    OMR {p.oldPrice.toFixed(3)} (Save {Math.round(((p.oldPrice - p.price)/p.oldPrice) * 100)}%)
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* Category */}
+                        <tr className="border-b border-neutral-100 hover:bg-neutral-50/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Category Tab
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs font-extrabold uppercase text-neutral-600">
+                              <span className="bg-neutral-100 px-2 py-1 rounded-md text-[10px]">
+                                {p.category}
+                              </span>
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* CPU / Processor / RAM / Memory */}
+                        <tr className="border-b border-neutral-100 bg-neutral-50/10 hover:bg-neutral-50/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Chip & Performance
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs text-neutral-700 font-semibold">
+                              <div className="flex items-start gap-1.5">
+                                <span className="text-sky-600 text-xs">⚡</span>
+                                <span>{getSpecDetail(p, 'performance')}</span>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* Screen / Display Spec */}
+                        <tr className="border-b border-neutral-100 hover:bg-neutral-50/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Display / Optics
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs text-neutral-700 font-semibold">
+                              <div className="flex items-start gap-1.5">
+                                <span className="text-sky-600 text-xs">🖥️</span>
+                                <span>{getSpecDetail(p, 'display')}</span>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* Battery, cooling / Power */}
+                        <tr className="border-b border-neutral-100 bg-neutral-50/10 hover:bg-neutral-50/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Power, Save & Battery
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs text-neutral-700 font-semibold">
+                              <div className="flex items-start gap-1.5">
+                                <span className="text-sky-600 text-xs">🔋</span>
+                                <span>{getSpecDetail(p, 'battery')}</span>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* Camera details */}
+                        <tr className="border-b border-neutral-100 hover:bg-neutral-50/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Camera / Audio
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs text-neutral-700 font-semibold">
+                              <div className="flex items-start gap-1.5">
+                                <span className="text-sky-600 text-xs">📸</span>
+                                <span>{getSpecDetail(p, 'camera_audio')}</span>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* Extra features */}
+                        <tr className="border-b border-neutral-100 bg-neutral-50/10 hover:bg-neutral-50/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Hardware & Design
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs text-neutral-700 font-semibold">
+                              <div className="flex items-start gap-1.5">
+                                <span className="text-sky-600 text-xs">✨</span>
+                                <span>{getSpecDetail(p, 'extra')}</span>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* Description Summary */}
+                        <tr className="border-b border-neutral-100 hover:bg-neutral-50/20 transition-colors">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Product Description
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4 text-xs text-neutral-500 leading-relaxed max-w-[220px]">
+                              {p.description}
+                            </td>
+                          ))}
+                        </tr>
+
+                        {/* CTA Order Button */}
+                        <tr className="bg-neutral-50/25">
+                          <td className="p-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                            Action
+                          </td>
+                          {products.filter(p => compareIds.includes(p.id)).map((p) => (
+                            <td key={p.id} className="p-4">
+                              <div className="flex flex-col gap-2">
+                                <button
+                                  onClick={() => {
+                                    handleAddToCart(p);
+                                    triggerToast(`🛒 Added ${p.name} directly from specifications comparison!`);
+                                  }}
+                                  className="w-full py-2.5 px-4 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-extrabold shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+                                >
+                                  <ShoppingCart className="w-3.5 h-3.5" />
+                                  <span>Add to Cart</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setQuickViewProduct(p);
+                                    setCompareModalOpen(false);
+                                  }}
+                                  className="w-full py-2 px-4 bg-white border border-neutral-200 hover:bg-neutral-100 text-neutral-700 rounded-xl text-xs font-extrabold transition cursor-pointer"
+                                >
+                                  Full Specifications
+                                </button>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="bg-neutral-50 px-6 py-4.5 sm:flex sm:flex-row-reverse sm:px-8 border-t border-neutral-100 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCompareModalOpen(false)}
+                  className="inline-flex w-full justify-center rounded-xl bg-neutral-900 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-sky-600 transition sm:ml-3 sm:w-auto cursor-pointer"
+                >
+                  Close Matrix
+                </button>
+                {products.filter(p => compareIds.includes(p.id)).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCompareIds([]);
+                      setCompareModalOpen(false);
+                      triggerToast('⚖️ Comparison lists reset.');
+                    }}
+                    className="mt-3 inline-flex w-full justify-center rounded-xl bg-white border border-neutral-200 px-5 py-3 text-xs font-bold text-neutral-500 hover:text-red-650 hover:bg-neutral-50 transition sm:mt-0 sm:w-auto cursor-pointer"
+                  >
+                    Clear Comparison List
+                  </button>
+                )}
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

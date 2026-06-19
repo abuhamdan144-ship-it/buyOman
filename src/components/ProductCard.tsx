@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Heart, Star, Eye, ShoppingCart, Bell } from 'lucide-react';
+import { Heart, Star, Eye, ShoppingCart, Bell, GitCompare } from 'lucide-react';
 import { Product } from '../types.ts';
 
 interface ProductCardProps {
@@ -12,20 +12,24 @@ interface ProductCardProps {
   product: Product;
   isWishlisted: boolean;
   isPriceAlertSubscribed: boolean;
+  isComparing: boolean;
   onAddToCart: (product: Product) => void;
   onToggleWishlist: (product: Product) => void;
   onQuickView: (product: Product) => void;
   onTogglePriceAlert: (product: Product) => void;
+  onToggleCompare: (product: Product) => void;
 }
 
 export default function ProductCard({
   product,
   isWishlisted,
   isPriceAlertSubscribed,
+  isComparing,
   onAddToCart,
   onToggleWishlist,
   onQuickView,
   onTogglePriceAlert,
+  onToggleCompare,
 }: ProductCardProps) {
   const discountPercentage = product.oldPrice
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
@@ -90,6 +94,23 @@ export default function ProductCard({
               isPriceAlertSubscribed ? 'text-amber-505 fill-amber-400 text-amber-500' : 'text-neutral-500'
             }`} 
           />
+        </button>
+
+        {/* Product Comparison Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCompare(product);
+          }}
+          id={`compare-btn-${product.id}`}
+          className={`w-9 h-9 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center transition active:scale-90 ${
+            isComparing
+              ? 'bg-sky-500 text-white hover:bg-sky-650'
+              : 'bg-white/80 hover:bg-white text-neutral-500 hover:text-sky-500'
+          }`}
+          title={isComparing ? "Remove dynamic specifications comparison" : "Add to side-by-side comparison (Max 3)"}
+        >
+          <GitCompare className="w-4.5 h-4.5" />
         </button>
       </div>
 
