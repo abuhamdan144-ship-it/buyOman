@@ -172,6 +172,36 @@ export default function App() {
   const [checkoutOpen, setCheckoutOpen] = useState<boolean>(false);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
 
+  // Recently Viewed State
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('buyoman_recently_viewed_products');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Keep recentlyViewedIds synced to localStorage
+  useEffect(() => {
+    localStorage.setItem('buyoman_recently_viewed_products', JSON.stringify(recentlyViewedIds));
+  }, [recentlyViewedIds]);
+
+  // Track product views
+  useEffect(() => {
+    if (quickViewProduct) {
+      setRecentlyViewedIds((prev) => {
+        const filtered = prev.filter(id => id !== quickViewProduct.id);
+        return [quickViewProduct.id, ...filtered].slice(0, 5);
+      });
+    }
+  }, [quickViewProduct]);
+
+  // Derived state for Recently Viewed products
+  const recentlyViewedProducts = recentlyViewedIds
+    .map(id => products.find(p => p.id === id))
+    .filter((p): p is Product => !!p);
+
   // Product Comparison States
   const [compareIds, setCompareIds] = useState<number[]>([]);
   const [compareModalOpen, setCompareModalOpen] = useState<boolean>(false);
@@ -864,6 +894,84 @@ export default function App() {
             </div>
           )}
         </section>
+
+        {/* ========================================= */}
+        {/* RECENTLY VIEWED PRODUCTS SECTION */}
+        {/* ========================================= */}
+        {recentlyViewedProducts.length > 0 && (
+          <section id="recently-viewed-section" className="my-16 bg-white border border-neutral-200/80 rounded-3xl p-6 md:p-10 shadow-xs animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <div>
+                <span className="text-xs font-bold text-sky-650 tracking-wider uppercase bg-sky-50 py-1 px-3 rounded-full inline-block mb-3">Your Browsing History</span>
+                <h3 className="text-xl md:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+                  <span>🕒 Recently Viewed Products</span>
+                </h3>
+                <p className="text-neutral-500 text-xs font-medium mt-1">
+                  Revisit hardware specifications of the last 5 items you checked out.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setRecentlyViewedIds([]);
+                  triggerToast('🕒 Cleared recently viewed history.');
+                }}
+                className="self-start sm:self-auto text-xs font-bold text-neutral-450 hover:text-red-700 bg-neutral-50 hover:bg-red-50 px-4 py-2 rounded-xl border border-neutral-200/80 transition cursor-pointer"
+              >
+                Clear History
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {recentlyViewedProducts.map((prod) => (
+                <div 
+                  key={prod.id}
+                  onClick={() => {
+                    setQuickViewTab('specs');
+                    setQuickViewProduct(prod);
+                  }}
+                  className="group relative bg-neutral-50/50 hover:bg-white border border-neutral-150 hover:border-sky-305 rounded-2xl p-4 transition-all duration-300 cursor-pointer hover:shadow-md flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Badge */}
+                    <span className="text-[9px] uppercase font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full inline-block mb-2">
+                      {prod.brand}
+                    </span>
+
+                    {/* Image / Emoji */}
+                    <div className="h-28 w-full bg-white rounded-xl flex items-center justify-center p-2 mb-3 border border-neutral-100 group-hover:scale-105 transition-transform duration-300">
+                      {prod.image ? (
+                        <img 
+                          src={prod.image} 
+                          alt={prod.name} 
+                          loading="lazy" 
+                          referrerPolicy="no-referrer"
+                          className="max-h-full max-w-full object-contain" 
+                        />
+                      ) : (
+                        <span className="text-4xl select-none">{prod.emoji}</span>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h4 className="text-xs font-bold text-neutral-800 line-clamp-2 leading-snug group-hover:text-sky-700 transition">
+                      {prod.name}
+                    </h4>
+                  </div>
+
+                  <div className="mt-4 pt-2 border-t border-neutral-100 flex items-center justify-between">
+                    <span className="text-xs font-black text-neutral-900">
+                      OMR {prod.price.toFixed(3)}
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-600 flex items-center gap-0.5">
+                      ★ {prod.rating}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* SECT: SMALL KITCHEN APPLIANCES FOCUS (Grid of Small helpful gadgets) */}
         <section className="my-16 bg-gradient-to-br from-neutral-50 to-neutral-100/50 rounded-3xl p-6 md:p-10 border border-neutral-100">
