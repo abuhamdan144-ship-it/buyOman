@@ -13,7 +13,7 @@ export interface Product {
   rating: number;
   reviews: number;
   badge?: 'new' | 'sale' | 'hot' | 'best';
-  category: 'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory';
+  category: 'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory' | 'air_conditin' | 'fridge' | 'wasing_machin' | 'dryer' | 'cooking_rang' | 'biltin_coocing_range' | 'freezer';
   description: string;
   specs: string[];
   image?: string; // High quality uploaded image (Base64 string)

@@ -56,7 +56,7 @@ export default function AdminDashboard({
   const [activeTab, setActiveTab] = useState<'analytics' | 'inventory' | 'orders' | 'promotions'>('analytics');
 
   // Promotions & Campaign Manager State Variables
-  const [promoCategory, setPromoCategory] = useState<'all' | 'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory'>('all');
+  const [promoCategory, setPromoCategory] = useState<'all' | 'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory' | 'air_conditin' | 'fridge' | 'wasing_machin' | 'dryer' | 'cooking_rang' | 'biltin_coocing_range' | 'freezer'>('all');
   const [promoDiscountPct, setPromoDiscountPct] = useState<number>(10);
   const [promoBadge, setPromoBadge] = useState<'sale' | 'hot' | 'best' | '' | 'flash'>('sale');
 
@@ -75,7 +75,7 @@ export default function AdminDashboard({
   // New product input state
   const [newProdName, setNewProdName] = useState('');
   const [newProdBrand, setNewProdBrand] = useState('');
-  const [newProdCategory, setNewProdCategory] = useState<'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory'>('mobile');
+  const [newProdCategory, setNewProdCategory] = useState<'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory' | 'air_conditin' | 'fridge' | 'wasing_machin' | 'dryer' | 'cooking_rang' | 'biltin_coocing_range' | 'freezer'>('mobile');
   const [newProdEmoji, setNewProdEmoji] = useState('📦');
   const [newProdPrice, setNewProdPrice] = useState('');
   const [newProdOldPrice, setNewProdOldPrice] = useState('');
@@ -587,12 +587,19 @@ export default function AdminDashboard({
                             <select
                               value={newProdCategory}
                               onChange={e => setNewProdCategory(e.target.value as any)}
-                              className="w-full bg-neutral-900 border border-neutral-850 rounded-lg p-2.5 focus:outline-none text-white font-bold"
+                              className="w-full bg-neutral-900 border border-neutral-850 rounded-lg p-2.5 focus:outline-none text-white font-bold text-xs"
                             >
                               <option value="mobile">Smartphones</option>
                               <option value="laptop">Laptops</option>
                               <option value="tv">Televisions</option>
-                              <option value="appliance">Smart Appliances</option>
+                              <option value="air_conditin">Air Conditioning</option>
+                              <option value="fridge">Fridges</option>
+                              <option value="wasing_machin">Washing Machines</option>
+                              <option value="dryer">Dryers</option>
+                              <option value="cooking_rang">Cooking Ranges</option>
+                              <option value="biltin_coocing_range">Built-in Cooking Ranges</option>
+                              <option value="freezer">Freezers</option>
+                              <option value="appliance">Small Appliances</option>
                               <option value="accessory">Accessories</option>
                             </select>
                           </div>
@@ -601,19 +608,25 @@ export default function AdminDashboard({
                             <select
                               value={newProdEmoji}
                               onChange={e => setNewProdEmoji(e.target.value)}
-                              className="w-full bg-neutral-900 border border-neutral-850 rounded-lg p-2.5 focus:outline-none text-white font-bold"
+                              className="w-full bg-neutral-900 border border-neutral-850 rounded-lg p-2.5 focus:outline-none text-white font-bold text-xs"
                             >
                               <option value="📱">📱 Phone</option>
                               <option value="💻">💻 Laptop</option>
                               <option value="📺">📺 Television</option>
                               <option value="❄️">❄️ AC Unit</option>
-                              <option value="🧺">🧺 Washer</option>
-                              <option value="🎧">🎧 Audio</option>
+                              <option value="🌬️">🌬️ Cool Breeze</option>
                               <option value="🧊">🧊 Refrigerator</option>
-                              <option value="🍳">🍳 range OMR</option>
+                              <option value="🧺">🧺 Washer</option>
+                              <option value="🧼">🧼 Soap / Clean</option>
+                              <option value="👕">👕 Dryer / Clothes</option>
+                              <option value="🍳">🍳 Cooking Range</option>
+                              <option value="🔥">🔥 Built-in Induction</option>
+                              <option value="🍦">🍦 Freezer / Cold</option>
+                              <option value="🎧">🎧 Audio / Headphones</option>
                               <option value="🧹">🧹 Vacuum</option>
                               <option value="🤖">🤖 Robot Cleaner</option>
                               <option value="⌚">⌚ Watch</option>
+                              <option value="📦">📦 General Box</option>
                             </select>
                           </div>
                           <div>
@@ -998,12 +1011,19 @@ export default function AdminDashboard({
                           <select
                             value={promoCategory}
                             onChange={(e) => setPromoCategory(e.target.value as any)}
-                            className="w-full bg-neutral-900 border border-neutral-805 rounded-lg p-2.5 focus:outline-none text-white font-bold"
+                            className="w-full bg-neutral-900 border border-neutral-805 rounded-lg p-2.5 focus:outline-none text-white font-bold text-xs"
                           >
                             <option value="all">All Departments / Categories</option>
                             <option value="mobile">Smartphones Collection</option>
                             <option value="laptop">Premium Laptops</option>
                             <option value="tv">High-Def Televisions</option>
+                            <option value="air_conditin">Air Conditioning</option>
+                            <option value="fridge">Fridges</option>
+                            <option value="wasing_machin">Washing Machines</option>
+                            <option value="dryer">Dryers</option>
+                            <option value="cooking_rang">Cooking Ranges</option>
+                            <option value="biltin_coocing_range">Built-in Cooking Ranges</option>
+                            <option value="freezer">Freezers</option>
                             <option value="appliance">Smart Appliances</option>
                             <option value="accessory">Accessories & Wearables</option>
                           </select>

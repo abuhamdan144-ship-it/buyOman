@@ -820,8 +820,15 @@ export default function App() {
                 { id: 'mobile', icon: '📱', label: 'Mobiles' },
                 { id: 'laptop', icon: '💻', label: 'Laptops' },
                 { id: 'tv', icon: '📺', label: 'TV & Video' },
-                { id: 'appliance', icon: '❄️', label: 'Appliances' },
-                { id: 'accessory', icon: '🔌', label: 'Accessories' }
+                { id: 'air_conditin', icon: '🌬️', label: 'Air Conditions' },
+                { id: 'fridge', icon: '🧊', label: 'Fridges' },
+                { id: 'wasing_machin', icon: '🧺', label: 'Washing Machines' },
+                { id: 'dryer', icon: '👕', label: 'Dryers' },
+                { id: 'cooking_rang', icon: '🍳', label: 'Cooking Ranges' },
+                { id: 'biltin_coocing_range', icon: '🔥', label: 'Built-in Cooking' },
+                { id: 'freezer', icon: '🍦', label: 'Freezers' },
+                { id: 'appliance', icon: '🔌', label: 'Small Appliances' },
+                { id: 'accessory', icon: '🎧', label: 'Accessories' }
               ].map((tab) => (
                 <button
                   key={tab.id}
