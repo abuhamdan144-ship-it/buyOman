@@ -125,7 +125,7 @@ export default function ProductCard({
           onQuickView(product);
         }}
       >
-        <div className="transition-opacity duration-300 group-hover:opacity-0 flex items-center justify-center">
+        <div className="transform group-hover:scale-140 duration-500 ease-out transition-transform flex items-center justify-center">
           {product.image ? (
             <img 
               src={product.image} 
@@ -143,7 +143,8 @@ export default function ProductCard({
         </div>
         
         {/* Interactive Overlay containing the 'Quick Add' on hover */}
-        <div className="absolute inset-0 bg-white/95 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-2 px-6">
+        {/* Semi-transparent frosted glass design allows fine details to be visible beneath the buttons */}
+        <div className="absolute inset-0 bg-white/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-2 px-6">
           {(() => {
             const stock = product.stock !== undefined ? product.stock : (((product.id * 7) % 15) + 2);
             if (stock === 0) {
@@ -155,8 +156,8 @@ export default function ProductCard({
                   }}
                   className={`w-full py-2.5 px-4 rounded-xl shadow-md text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer ${
                     isStockNotified
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : 'bg-amber-500 hover:bg-amber-600 text-white active:scale-95'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                      : 'bg-amber-500 hover:bg-amber-600 text-white active:scale-95 shadow-amber-500/20'
                   }`}
                 >
                   <Bell className={`w-4 h-4 ${isStockNotified ? 'fill-white' : ''}`} />
@@ -170,7 +171,7 @@ export default function ProductCard({
                   e.stopPropagation();
                   onAddToCart(product);
                 }}
-                className="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white rounded-xl shadow-md transition-all duration-200 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white rounded-xl shadow-md transition-all duration-200 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-sky-600/25"
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>Quick Add</span>
@@ -181,9 +182,24 @@ export default function ProductCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              onToggleCompare(product);
+            }}
+            className={`w-full py-2 px-4 rounded-xl text-[10px] font-bold uppercase tracking-wide flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs border ${
+              isComparing
+                ? 'bg-sky-500 text-white border-transparent hover:bg-sky-600'
+                : 'bg-white/90 hover:bg-neutral-100 text-neutral-800 border-neutral-200/40'
+            }`}
+          >
+            <GitCompare className={`w-3.5 h-3.5 ${isComparing ? 'text-white' : 'text-sky-500'}`} />
+            <span>{isComparing ? 'Comparing ✓' : 'Compare Product'}</span>
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               onQuickView(product);
             }}
-            className="w-full py-2 px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl text-[10px] font-bold uppercase tracking-wide flex items-center justify-center gap-1 transition-all cursor-pointer"
+            className="w-full py-2 px-4 bg-white/90 hover:bg-neutral-100 text-neutral-800 rounded-xl text-[10px] font-bold uppercase tracking-wide flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs border border-neutral-200/40"
           >
             <Eye className="w-3.5 h-3.5 text-neutral-500" />
             <span>Specifications</span>

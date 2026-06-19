@@ -199,6 +199,166 @@ export default function App() {
     localStorage.setItem('buyoman_recently_viewed_products', JSON.stringify(recentlyViewedIds));
   }, [recentlyViewedIds]);
 
+  // Warranty Lookup System State
+  const [warrantySearchId, setWarrantySearchId] = useState<string>('');
+  const [warrantyResult, setWarrantyResult] = useState<{
+    orderId: string;
+    date: string;
+    items: Array<{
+      product: Product;
+      purchaseDate: string;
+    }>;
+  } | null>(null);
+  const [warrantyError, setWarrantyError] = useState<string | null>(null);
+
+  const calculateWarranty = (purchaseDateStr: string, category: string) => {
+    try {
+      const purchaseDate = new Date(purchaseDateStr);
+      let durationMonths = 12; // default
+      const cat = (category || '').toLowerCase();
+      
+      if (['appliance', 'air_conditin', 'fridge', 'wasing_machin', 'dryer', 'cooking_rang', 'biltin_coocing_range', 'freezer'].includes(cat)) {
+        durationMonths = 36;
+      } else if (['laptop', 'tv'].includes(cat)) {
+        durationMonths = 24;
+      } else {
+        durationMonths = 12;
+      }
+
+      const expiryDate = new Date(purchaseDate);
+      expiryDate.setMonth(expiryDate.getMonth() + durationMonths);
+
+      const currentDate = new Date("2026-06-19"); // Anchor local context
+      const diffTime = expiryDate.getTime() - currentDate.getTime();
+      const isActive = diffTime > 0;
+
+      if (!isActive) {
+        return {
+          isActive: false,
+          expiryDate: expiryDate.toISOString().split('T')[0],
+          durationMonths,
+          text: "Expired"
+        };
+      }
+
+      const diffDaysTotal = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const buildRemainingText = (days: number) => {
+        if (days > 365) {
+          const yrs = Math.floor(days / 365);
+          const rem = days % 365;
+          const mos = Math.floor(rem / 30);
+          return `${yrs} Year${yrs > 1 ? 's' : ''} ${mos > 0 ? `, ${mos} Month${mos > 1 ? 's' : ''}` : ''}`;
+        }
+        if (days > 30) {
+          const mos = Math.floor(days / 30);
+          const remDays = days % 30;
+          return `${mos} Month${mos > 1 ? 's' : ''} ${remDays > 0 ? `, ${remDays} Day${remDays > 1 ? 's' : ''}` : ''}`;
+        }
+        return `${days} Day${days > 1 ? 's' : ''}`;
+      };
+
+      return {
+        isActive: true,
+        expiryDate: expiryDate.toISOString().split('T')[0],
+        durationMonths,
+        text: buildRemainingText(diffDaysTotal)
+      };
+    } catch {
+      return {
+        isActive: false,
+        expiryDate: purchaseDateStr,
+        durationMonths: 12,
+        text: "Error computing warranty date"
+      };
+    }
+  };
+
+  const handleWarrantyLookup = (searchId: string) => {
+    const trimmedId = searchId.trim();
+    if (!trimmedId) {
+      setWarrantyError("Please enter a valid Order ID.");
+      setWarrantyResult(null);
+      return;
+    }
+
+    if (trimmedId.toUpperCase() === 'ORD-SAMPLE-2026') {
+      const sampleResult = {
+        orderId: 'ORD-SAMPLE-2026',
+        date: '2025-10-15',
+        items: [
+          {
+            product: {
+              id: 991,
+              name: "MacBook Pro 16\" M3 Max Studio",
+              brand: "Apple",
+              emoji: "💻",
+              category: "laptop" as const,
+              price: 1399,
+              rating: 5,
+              reviews: 21,
+              description: "High end production tool for software engineers",
+              specs: []
+            },
+            purchaseDate: '2024-12-01',
+          },
+          {
+            product: {
+              id: 992,
+              name: "Xiaomi 14 Ultra 5G Professional",
+              brand: "Xiaomi",
+              emoji: "📱",
+              category: "mobile" as const,
+              price: 389,
+              rating: 4.8,
+              reviews: 14,
+              description: "Flagship mobile camera shooter",
+              specs: []
+            },
+            purchaseDate: '2025-10-15',
+          },
+          {
+            product: {
+              id: 993,
+              name: "Bosch Washing Machine Serie 6",
+              brand: "Bosch",
+              emoji: "🧺",
+              category: "wasing_machin" as const,
+              price: 249,
+              rating: 5,
+              reviews: 40,
+              description: "Ultra quiet long duration laundry care",
+              specs: []
+            },
+            purchaseDate: '2023-04-10',
+          }
+        ]
+      };
+      setWarrantyResult(sampleResult);
+      setWarrantyError(null);
+      triggerToast("🔐 Found Sample Electronics Registry Coverages!");
+      return;
+    }
+
+    const foundOrder = orders.find(o => o.id.toLowerCase() === trimmedId.toLowerCase());
+    if (foundOrder) {
+      const actualResult = {
+        orderId: foundOrder.id,
+        date: foundOrder.date,
+        items: foundOrder.items.map(item => ({
+          product: item.product,
+          purchaseDate: foundOrder.date
+        }))
+      };
+      setWarrantyResult(actualResult);
+      setWarrantyError(null);
+      triggerToast(`🔐 Active coverage found for Order ${foundOrder.id}!`);
+    } else {
+      setWarrantyError(`No registry coverage found for "${trimmedId}".`);
+      setWarrantyResult(null);
+    }
+  };
+
   // Track product views
   useEffect(() => {
     if (quickViewProduct) {
@@ -1475,6 +1635,167 @@ export default function App() {
             </div>
           </div>
 
+        </div>
+
+        {/* WARRANTY STATUS LOOKUP PORTAL */}
+        <div className="max-w-7xl mx-auto mt-12 pt-10 border-t border-neutral-800">
+          <div className="bg-neutral-950/40 rounded-3xl border border-neutral-800/80 p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row gap-8 justify-between items-start">
+              
+              <div className="max-w-md space-y-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-sm font-black tracking-wider uppercase text-white">Official Warranty Coverage Registry</h3>
+                </div>
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  Every product from BuyOman is fully covered by authorized global distributor care. Input your custom Order ID to verify active status, duration, and remaining protection.
+                </p>
+                <div className="pt-2 text-[10px] text-neutral-500 font-mono">
+                  <span>No Order? Try Sandbox Demo ID: </span>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setWarrantySearchId('ORD-SAMPLE-2026');
+                      handleWarrantyLookup('ORD-SAMPLE-2026');
+                    }}
+                    className="text-amber-500 hover:text-amber-400 font-bold underline cursor-pointer hover:no-underline"
+                  >
+                    ORD-SAMPLE-2026
+                  </button>
+                  {orders.length > 0 && (
+                    <div className="mt-2">
+                      <span>Recent Placed Orders: </span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {orders.slice(-3).map(o => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => {
+                              setWarrantySearchId(o.id);
+                              handleWarrantyLookup(o.id);
+                            }}
+                            className="bg-neutral-850 hover:bg-neutral-750 text-neutral-300 font-bold px-2 py-0.5 rounded-md hover:text-white cursor-pointer transition"
+                          >
+                            {o.id}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-full lg:max-w-md">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleWarrantyLookup(warrantySearchId);
+                  }}
+                  className="space-y-3"
+                >
+                  <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">Lookup Registry coverage</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={warrantySearchId}
+                      onChange={(e) => setWarrantySearchId(e.target.value)}
+                      placeholder="e.g. ORD-SAMPLE-2026 or regular ID..."
+                      className="flex-1 bg-neutral-900 border border-neutral-700/80 rounded-xl px-4 py-2.5 text-xs font-semibold placeholder-neutral-500 focus:outline-none focus:border-amber-500 transition-colors"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-amber-500 hover:bg-amber-600 text-neutral-900 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer select-none"
+                    >
+                      Lookup
+                    </button>
+                  </div>
+                  {warrantyError && (
+                    <p className="text-red-400 text-[10px] font-bold mt-1">⚠️ {warrantyError}</p>
+                  )}
+                </form>
+              </div>
+
+            </div>
+
+            {/* If coverage result is active/rendered */}
+            {warrantyResult && (
+              <div className="mt-8 border-t border-neutral-800/60 pt-6 animate-zoom-in">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">Coverage Ledger Found</span>
+                    <h4 className="text-sm font-extrabold text-white flex items-center gap-1.5 mt-0.5">
+                      <span>Order Reference:</span>
+                      <span className="font-mono text-amber-400">{warrantyResult.orderId}</span>
+                    </h4>
+                  </div>
+                  <div className="text-xs text-neutral-400 sm:text-right">
+                    <span className="block font-medium">Purchase Registry Date: <strong className="text-white font-mono">{warrantyResult.date}</strong></span>
+                    <span className="text-[10px] text-neutral-500">Local standard time Oman</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {warrantyResult.items.map((item, idx) => {
+                    const status = calculateWarranty(item.purchaseDate, item.product.category);
+                    return (
+                      <div key={idx} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 flex gap-4 items-start shadow-xs hover:border-neutral-750 transition duration-300">
+                        <span className="text-3xl select-none leading-none pt-0.5">{item.product.emoji || '📦'}</span>
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-sky-400 tracking-widest">{item.product.brand}</span>
+                            <h5 className="text-xs font-black text-white leading-tight truncate mr-1" title={item.product.name}>{item.product.name}</h5>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div>
+                              <span className="text-neutral-500 block">Warranty Period:</span>
+                              <span className="text-neutral-300 font-bold">{status.durationMonths / 12} Year{status.durationMonths > 12 ? 's' : ''} ({status.durationMonths} Mos)</span>
+                            </div>
+                            <div>
+                              <span className="text-neutral-500 block">Expires on:</span>
+                              <span className="text-neutral-300 font-mono font-bold">{status.expiryDate}</span>
+                            </div>
+                          </div>
+
+                          <div className="pt-1 flex items-center justify-between gap-2 border-t border-neutral-800/50 mt-2">
+                            <span className="text-[9px] text-neutral-500 font-mono uppercase tracking-wider">Care Provider: Muscat LLC</span>
+                            <div className="flex items-center gap-1.5">
+                              {status.isActive ? (
+                                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                                  <span>Active</span>
+                                </span>
+                              ) : (
+                                <span className="bg-neutral-800 text-neutral-400 border border-neutral-700 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase">
+                                  Expired
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {status.isActive && (
+                            <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-2.5 mt-2 flex items-center justify-between gap-4">
+                              <div>
+                                <span className="text-[8px] text-emerald-500/85 uppercase font-bold block leading-none">Time Remaining</span>
+                                <span className="text-[11px] font-extrabold text-emerald-400 tracking-tight leading-none mt-1 inline-block">{status.text}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => triggerToast(`🛡️ Warranty claim form dispatched. Reference number: W-CLAIM-${Math.floor(100000 + Math.random() * 900000)}`)}
+                                className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[9px] font-extrabold uppercase py-1 px-2.5 rounded-md cursor-pointer transition select-none"
+                              >
+                                File Claim
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-neutral-800 text-neutral-500 text-xs text-center flex flex-col md:flex-row md:justify-between items-center gap-4">
