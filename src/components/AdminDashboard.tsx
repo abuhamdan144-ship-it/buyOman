@@ -59,6 +59,7 @@ export default function AdminDashboard({
   onClearStockAlert,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<'analytics' | 'inventory' | 'orders' | 'promotions'>('analytics');
+  const [selectedAnalyticsCategory, setSelectedAnalyticsCategory] = useState<string | 'all'>('all');
 
   // Promotions & Campaign Manager State Variables
   const [promoCategory, setPromoCategory] = useState<'all' | 'mobile' | 'laptop' | 'tv' | 'appliance' | 'accessory' | 'air_conditin' | 'fridge' | 'wasing_machin' | 'dryer' | 'cooking_rang' | 'biltin_coocing_range' | 'freezer'>('all');
@@ -156,6 +157,47 @@ export default function AdminDashboard({
   orders.forEach(o => {
     const gov = o.billingInfo.governorate;
     governorateStats[gov] = (governorateStats[gov] || 0) + 1;
+  });
+
+  // Category-wise Analytics Definitions & Metrics
+  const categoriesList = [
+    { id: 'mobile', label: 'Mobiles & Tablets', emoji: '📱', color: 'bg-emerald-500', text: 'text-emerald-400' },
+    { id: 'laptop', label: 'Computers & Laptops', emoji: '💻', color: 'bg-indigo-500', text: 'text-indigo-400' },
+    { id: 'tv', label: 'Smart TVs & Monitors', emoji: '📺', color: 'bg-amber-500', text: 'text-amber-400' },
+    { id: 'air_conditin', label: 'Air Conditioners', emoji: '💨', color: 'bg-cyan-500', text: 'text-cyan-400' },
+    { id: 'fridge', label: 'Refrigerators & Chillers', emoji: '❄️', color: 'bg-teal-500', text: 'text-teal-400' },
+    { id: 'wasing_machin', label: 'Washing Machines', emoji: '🧺', color: 'bg-pink-500', text: 'text-pink-400' },
+    { id: 'dryer', label: 'Clothes Dryers', emoji: '☀️', color: 'bg-orange-500', text: 'text-orange-400' },
+    { id: 'cooking_rang', label: 'Cooking Ranges', emoji: '🍳', color: 'bg-rose-500', text: 'text-rose-400' },
+    { id: 'biltin_coocing_range', label: 'Built-in Cookers', emoji: '🔥', color: 'bg-red-500', text: 'text-red-400' },
+    { id: 'freezer', label: 'Deep Freezers', emoji: '🧊', color: 'bg-blue-500', text: 'text-blue-400' },
+    { id: 'appliance', label: 'Home Appliances', emoji: '🔌', color: 'bg-purple-500', text: 'text-purple-400' },
+    { id: 'accessory', label: 'Audio & Accessories', emoji: '🎧', color: 'bg-violet-500', text: 'text-violet-400' }
+  ];
+
+  const categoryMetrics = categoriesList.map(cat => {
+    const catProducts = products.filter(p => p.category === cat.id);
+    const totalStock = catProducts.reduce((sum, p) => sum + (p.stock !== undefined ? p.stock : 12), 0);
+    
+    let unitsSold = 0;
+    let revenueSum = 0;
+    
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.product.category === cat.id) {
+          unitsSold += item.quantity;
+          revenueSum += item.product.price * item.quantity;
+        }
+      });
+    });
+
+    return {
+      ...cat,
+      productsCount: catProducts.length,
+      totalStock,
+      unitsSold,
+      revenue: revenueSum,
+    };
   });
 
   // Handle inventory additions
@@ -476,6 +518,195 @@ export default function AdminDashboard({
                         <span className="text-[10px] text-neutral-500 font-bold block mt-1.5">Omani Governorates target logs</span>
                       </div>
 
+                    </div>
+
+                    {/* CATEGORY-WISE INTERACTIVE REPORT */}
+                    <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-neutral-800">
+                        <div>
+                          <h3 className="text-sm uppercase tracking-wider font-extrabold text-white flex items-center gap-2">
+                            <Layers className="w-5 h-5 text-amber-500 animate-pulse" />
+                            <span>Category-Wise Business Performance</span>
+                          </h3>
+                          <p className="text-[11px] text-neutral-400 mt-0.5">
+                            Click any category card to examine current inventory details and individual stock logs.
+                          </p>
+                        </div>
+                        {selectedAnalyticsCategory !== 'all' && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAnalyticsCategory('all')}
+                            className="bg-neutral-800 hover:bg-neutral-700 font-bold px-3 py-1.5 rounded-xl text-xs text-amber-400 border border-neutral-700 select-none cursor-pointer"
+                          >
+                            Reset Filter (Show All)
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {categoryMetrics.map((cat) => {
+                          const revenuePct = totalRevenue > 0 ? (cat.revenue / totalRevenue) * 100 : 0;
+                          const isSelected = selectedAnalyticsCategory === cat.id;
+
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => setSelectedAnalyticsCategory(cat.id)}
+                              className={`w-full text-left p-4 rounded-xl border transition-all duration-300 flex flex-col justify-between gap-3 ${
+                                isSelected
+                                  ? 'bg-neutral-900 border-amber-500 shadow-lg shadow-amber-500/5'
+                                  : 'bg-neutral-950 hover:bg-neutral-900/45 border-neutral-800/80 hover:border-neutral-700'
+                              } cursor-pointer`}
+                            >
+                              <div className="flex items-start justify-between gap-3 w-full">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-3xl leading-none">{cat.emoji}</span>
+                                  <div>
+                                    <h4 className="text-xs font-black text-white">{cat.label}</h4>
+                                    <span className="text-[10px] text-neutral-400 font-bold font-mono uppercase tracking-wider">
+                                      {cat.productsCount} listed products
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xs font-black text-white block">OMR {cat.revenue.toFixed(3)}</span>
+                                  <span className="text-[9px] text-amber-400/90 font-mono font-bold uppercase tracking-wider block">
+                                    {cat.unitsSold} sold
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="w-full space-y-1">
+                                <div className="flex justify-between items-center text-[10px] font-bold text-neutral-400">
+                                  <span>Revenue Contribution Share</span>
+                                  <span className="font-mono text-neutral-300">{Math.round(revenuePct)}%</span>
+                                </div>
+                                <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden w-full">
+                                  <div
+                                    className={`h-full ${cat.color} rounded-full transition-all duration-500`}
+                                    style={{ width: `${revenuePct > 0 ? Math.max(revenuePct, 3) : 0}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+
+                              <div className="flex justify-between items-center pt-2 border-t border-neutral-800/60 w-full text-[9px] font-mono text-neutral-500 font-bold">
+                                <span>Total Stock: <strong className="text-neutral-300">{cat.totalStock} units</strong></span>
+                                <span className="text-sky-400 hover:underline">Click to Inspect →</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* DRILLDOWN: DETAILED PRODUCTS FOR SELECTED CATEGORY */}
+                      {selectedAnalyticsCategory !== 'all' && (() => {
+                        const activeCatInfo = categoryMetrics.find(c => c.id === selectedAnalyticsCategory);
+                        const filteredProds = products.filter(p => p.category === selectedAnalyticsCategory);
+
+                        return (
+                          <div className="bg-neutral-900 p-5 rounded-xl border border-neutral-800/80 mt-4 space-y-4 animate-zoom-in">
+                            <div className="flex justify-between items-center pb-2 border-b border-neutral-800">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">{activeCatInfo?.emoji}</span>
+                                <div>
+                                  <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">
+                                    {activeCatInfo?.label} Inventory Status
+                                  </h4>
+                                  <p className="text-[10px] text-neutral-400">
+                                    Active catalog details with price specifications and dynamic warnings.
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="bg-neutral-800 text-sky-400 border border-neutral-700 px-2 py-1 rounded-md text-[10px] font-mono font-bold">
+                                {filteredProds.length} Items found
+                              </span>
+                            </div>
+
+                            {filteredProds.length === 0 ? (
+                              <p className="text-neutral-500 text-xs py-4 text-center border border-dashed border-neutral-850 rounded-lg">
+                                No products are currently assigned to this category in the catalog database. Use the "Inventory Controls" tab above to add item records.
+                              </p>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-xs">
+                                  <thead>
+                                    <tr className="border-b border-neutral-800 text-[10px] text-neutral-500 uppercase font-black uppercase tracking-wider">
+                                      <th className="py-2.5 px-2">Item Name</th>
+                                      <th className="py-2.5 px-2">Price</th>
+                                      <th className="py-2.5 px-2">Stock Level</th>
+                                      <th className="py-2.5 px-2">Rating</th>
+                                      <th className="py-2.5 px-2 text-right">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-neutral-850">
+                                    {filteredProds.map((prod) => {
+                                      const stockCount = prod.stock !== undefined ? prod.stock : 12;
+                                      const isLowStock = stockCount <= 5;
+
+                                      return (
+                                        <tr key={prod.id} className="hover:bg-neutral-950/20 transition duration-150">
+                                          <td className="py-3 px-2">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-base select-none">{prod.emoji || '📦'}</span>
+                                              <div>
+                                                <div className="font-extrabold text-white truncate max-w-[200px]" title={prod.name}>
+                                                  {prod.name}
+                                                </div>
+                                                <div className="text-[9px] text-neutral-500 font-mono">
+                                                  ID: {prod.id} | {prod.brand}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </td>
+                                          <td className="py-3 px-2 font-mono font-extrabold text-neutral-100">
+                                            OMR {prod.price.toFixed(3)}
+                                            {prod.oldPrice && (
+                                              <span className="text-[9px] text-red-400/80 line-through font-normal block">
+                                                OMR {prod.oldPrice.toFixed(3)}
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="py-3 px-2">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className={`w-2 h-2 rounded-full ${isLowStock ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`}></span>
+                                              <span className={`font-mono font-bold ${isLowStock ? 'text-red-400 font-black' : 'text-neutral-300'}`}>
+                                                {stockCount} units
+                                              </span>
+                                              {isLowStock && (
+                                                <span className="bg-red-500/10 text-red-400 border border-red-500/15 text-[8px] px-1 rounded-sm uppercase font-black tracking-widest leading-none py-0.5 ml-1">
+                                                  critically low
+                                                </span>
+                                              )}
+                                            </div>
+                                          </td>
+                                          <td className="py-3 px-2 text-neutral-400 font-bold">
+                                            ⭐ {prod.rating} <span className="text-[9px] font-normal text-neutral-500">({prod.reviews})</span>
+                                          </td>
+                                          <td className="py-3 px-2 text-right">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                // Trigger editing mode directly
+                                                setEditingProduct(prod);
+                                                setActiveTab('inventory');
+                                                onTriggerToast(`✏️ Opening specifications editor for ${prod.name}`);
+                                              }}
+                                              className="text-[9px] font-extrabold uppercase bg-neutral-850 hover:bg-neutral-750 border border-neutral-700 hover:border-neutral-600 text-white rounded-md py-1 px-2.5 cursor-pointer transition select-none"
+                                            >
+                                              Adjust Specs / Stock
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Oman Governorate logistics map distribution */}
