@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   ShoppingBag, 
   ShoppingCart,
@@ -172,6 +172,18 @@ export default function App() {
   const [checkoutOpen, setCheckoutOpen] = useState<boolean>(false);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
 
+  // Stock notification system states
+  const [stockNotifications, setStockNotifications] = useState<{ id: string, productId: number, email: string, productName: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('buyoman_stock_notifs');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [notifyingProduct, setNotifyingProduct] = useState<Product | null>(null);
+  const [stockAlertEmail, setStockAlertEmail] = useState<string>('');
+
   // Recently Viewed State
   const [recentlyViewedIds, setRecentlyViewedIds] = useState<number[]>(() => {
     try {
@@ -201,6 +213,44 @@ export default function App() {
   const recentlyViewedProducts = recentlyViewedIds
     .map(id => products.find(p => p.id === id))
     .filter((p): p is Product => !!p);
+
+  // Derived state for Recommended for You products
+  const recommendedProducts = useMemo(() => {
+    if (recentlyViewedIds.length > 0) {
+      // Gather categories and brands of recently viewed items
+      const viewedCategories = new Set(recentlyViewedProducts.map(p => p.category));
+      const viewedBrands = new Set(recentlyViewedProducts.map(p => p.brand));
+
+      // Filter products that the user has NOT viewed yet to keep suggestions fresh
+      let candidates = products.filter(p => !recentlyViewedIds.includes(p.id));
+      if (candidates.length === 0) {
+        candidates = products;
+      }
+
+      // Score candidates:
+      // +5 points if same category
+      // +3 points if same brand
+      // + rating * 0.5 (quality booster)
+      const scored = candidates.map(p => {
+        let score = 0;
+        if (viewedCategories.has(p.category)) score += 5;
+        if (viewedBrands.has(p.brand)) score += 3;
+        score += p.rating * 0.5;
+        return { product: p, score };
+      });
+
+      // Sort by score descending and return the top 4
+      return scored
+        .sort((a, b) => b.score - a.score)
+        .map(entry => entry.product)
+        .slice(0, 4);
+    } else {
+      // If no recently viewed products, recommend top-rated overall products (excluding already-featured items if possible)
+      return [...products]
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 4);
+    }
+  }, [recentlyViewedIds, recentlyViewedProducts, products]);
 
   // Product Comparison States
   const [compareIds, setCompareIds] = useState<number[]>([]);
@@ -347,6 +397,74 @@ export default function App() {
         return [...prev, product.id];
       }
     });
+  };
+
+  // Sync stock notification registrations to localStorage
+  useEffect(() => {
+    localStorage.setItem('buyoman_stock_notifs', JSON.stringify(stockNotifications));
+  }, [stockNotifications]);
+
+  const prevStocksRef = useRef<Record<number, number>>({});
+
+  // Monitor stock level changes and simulate sending back-in-stock emails
+  useEffect(() => {
+    const currentStocks: Record<number, number> = {};
+    products.forEach((p) => {
+      currentStocks[p.id] = p.stock !== undefined ? p.stock : (((p.id * 7) % 15) + 2);
+    });
+
+    if (Object.keys(prevStocksRef.current).length > 0) {
+      products.forEach((p) => {
+        const currentStock = currentStocks[p.id];
+        const prevStock = prevStocksRef.current[p.id];
+        if (prevStock !== undefined && prevStock === 0 && currentStock > 0) {
+          // Find matching alerts
+          const matches = stockNotifications.filter(alert => alert.productId === p.id);
+          if (matches.length > 0) {
+            matches.forEach((alert) => {
+              // Trigger automated email simulation dispatch
+              triggerToast(`📧 [OmanMail Server] Stock Alert sent to ${alert.email}: "${p.name}" is back in Stock with ${currentStock} units available!`);
+            });
+            // Auto clean up alerts that have been notified
+            setStockNotifications(prev => prev.filter(alert => alert.productId !== p.id));
+          }
+        }
+      });
+    }
+
+    prevStocksRef.current = currentStocks;
+  }, [products, stockNotifications]);
+
+  const handleNotifyMeClick = (product: Product) => {
+    setNotifyingProduct(product);
+    const lastAlertEmail = stockNotifications.length > 0 ? stockNotifications[stockNotifications.length - 1].email : '';
+    setStockAlertEmail(lastAlertEmail || 'customer@buyoman.com');
+  };
+
+  const handleRegisterStockNotify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifyingProduct || !stockAlertEmail) return;
+
+    const alreadyExists = stockNotifications.some(
+      n => n.productId === notifyingProduct.id && n.email.toLowerCase() === stockAlertEmail.toLowerCase()
+    );
+
+    if (alreadyExists) {
+      triggerToast(`⚠️ Already signed up: You are already subscribed to stock updates for ${notifyingProduct.name} at ${stockAlertEmail}.`);
+      setNotifyingProduct(null);
+      return;
+    }
+
+    const newAlert = {
+      id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      productId: notifyingProduct.id,
+      email: stockAlertEmail.trim(),
+      productName: notifyingProduct.name
+    };
+
+    setStockNotifications(prev => [...prev, newAlert]);
+    triggerToast(`🔔 Alert Registered! We will email you at ${stockAlertEmail} when "${notifyingProduct.name}" is restocked!`);
+    setNotifyingProduct(null);
   };
 
   // Sync to localstorage
@@ -891,11 +1009,13 @@ export default function App() {
                   isWishlisted={wishlist.some(i => i.id === prod.id)}
                   isPriceAlertSubscribed={priceAlertSubscriptions.includes(prod.id)}
                   isComparing={compareIds.includes(prod.id)}
+                  isStockNotified={stockNotifications.some(sn => sn.productId === prod.id)}
                   onAddToCart={handleAddToCart}
                   onToggleWishlist={handleToggleWishlist}
                   onQuickView={(p) => { setQuickViewTab('specs'); setQuickViewProduct(p); }}
                   onTogglePriceAlert={handleTogglePriceAlert}
                   onToggleCompare={handleToggleCompare}
+                  onNotifyMe={handleNotifyMeClick}
                 />
               ))}
             </div>
@@ -975,6 +1095,52 @@ export default function App() {
                     </span>
                   </div>
                 </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ========================================= */}
+        {/* RECOMMENDED FOR YOU SECTION */}
+        {/* ========================================= */}
+        {recommendedProducts.length > 0 && (
+          <section id="recommended-for-you-section" className="my-16 bg-gradient-to-b from-sky-500/5 to-transparent border border-sky-100/50 rounded-3xl p-6 md:p-10 shadow-xs animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <div>
+                <span className="text-xs font-bold text-sky-650 tracking-wider uppercase bg-sky-50 py-1 px-3 rounded-full inline-block mb-3 animate-pulse">
+                  {recentlyViewedIds.length > 0 ? "★ Highly Tailored For You" : "✦ Premium Suggestions"}
+                </span>
+                <h3 className="text-xl md:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+                  <span>✨ Recommended for You</span>
+                </h3>
+                <p className="text-neutral-500 text-xs font-medium mt-1">
+                  {recentlyViewedIds.length > 0 ? (
+                    <span>
+                      Smart recommendations curated based on your interest in <span className="text-sky-700 font-bold">{Array.from(new Set(recentlyViewedProducts.map(p => p.brand))).slice(0, 2).join(' & ')}</span> products.
+                    </span>
+                  ) : (
+                    "Trending and top-rated premium electronics and appliances popular with shoppers in Oman."
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {recommendedProducts.map((prod) => (
+                <ProductCard
+                  key={prod.id}
+                  product={prod}
+                  isWishlisted={wishlist.some(i => i.id === prod.id)}
+                  isPriceAlertSubscribed={priceAlertSubscriptions.includes(prod.id)}
+                  isComparing={compareIds.includes(prod.id)}
+                  isStockNotified={stockNotifications.some(sn => sn.productId === prod.id)}
+                  onAddToCart={handleAddToCart}
+                  onToggleWishlist={handleToggleWishlist}
+                  onQuickView={(p) => { setQuickViewTab('specs'); setQuickViewProduct(p); }}
+                  onTogglePriceAlert={handleTogglePriceAlert}
+                  onToggleCompare={handleToggleCompare}
+                  onNotifyMe={handleNotifyMeClick}
+                />
               ))}
             </div>
           </section>
@@ -1579,6 +1745,93 @@ export default function App() {
       )}
 
       {/* ========================================= */}
+      {/* DIALOG: STOCK NOTIFICATION SIGN-UP */}
+      {/* ========================================= */}
+      {notifyingProduct && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+          <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            
+            {/* Background overlay */}
+            <div className="fixed inset-0 bg-neutral-900/60 transition-opacity backdrop-blur-xs" onClick={() => setNotifyingProduct(null)}></div>
+            
+            <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+
+            <div className="relative inline-block transform overflow-hidden rounded-3xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md sm:align-middle animate-zoom-in">
+              
+              <div className="bg-gradient-to-br from-amber-500/10 to-transparent p-6 sm:p-8">
+                {/* Close top button */}
+                <button 
+                  onClick={() => setNotifyingProduct(null)}
+                  className="absolute right-4 top-4 p-1 rounded-full text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md">
+                    <Bell className="w-6 h-6 animate-bounce" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold text-amber-600 uppercase tracking-widest block">Restock Alert System</span>
+                    <h3 className="text-lg font-black text-neutral-900 tracking-tight">Stock Notification</h3>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-neutral-100 rounded-2xl p-4 flex gap-4 items-center mb-6 shadow-xs">
+                  {notifyingProduct.image ? (
+                    <img src={notifyingProduct.image} alt={notifyingProduct.name} className="w-12 h-12 object-contain rounded-md" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className="text-4xl select-none">{notifyingProduct.emoji}</span>
+                  )}
+                  <div>
+                    <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider leading-none mb-1">{notifyingProduct.brand}</h4>
+                    <p className="text-sm font-extrabold text-neutral-800 leading-tight line-clamp-1">{notifyingProduct.name}</p>
+                    <span className="inline-block mt-1 text-[10px] bg-red-50 text-red-700 font-extrabold px-2 py-0.5 rounded-md">Currently Sold Out</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleRegisterStockNotify}>
+                  <label className="block mb-2 text-xs font-bold text-neutral-800 tracking-wide uppercase">Your Email Address</label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={stockAlertEmail}
+                      onChange={e => setStockAlertEmail(e.target.value)}
+                      placeholder="e.g. customer@buyoman.com"
+                      className="w-full bg-neutral-50 hover:bg-neutral-100/50 focus:bg-white border border-neutral-200 rounded-2xl py-3.5 pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm font-semibold transition-all text-neutral-800"
+                      required
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 text-xs font-mono select-none">OM</span>
+                  </div>
+                  
+                  <p className="text-[10px] text-neutral-400 mt-3 leading-relaxed">
+                    By submitting, you authorize the BuyOman catalog tracking system to send a high-priority restock bulletin to this email address when storage units increase above zero.
+                  </p>
+
+                  <div className="mt-8 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNotifyingProduct(null)}
+                      className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-xs font-black uppercase transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer"
+                    >
+                      Register
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================= */}
       {/* DIALOG DIALOG: PRODUCT SPECIFICATION QUICK VIEW */}
       {/* ========================================= */}
       {quickViewProduct && (
@@ -1618,9 +1871,34 @@ export default function App() {
 
                   {/* Right Side Info */}
                   <div className="flex-1">
-                    <span className="text-[10px] font-bold text-sky-600 tracking-wider uppercase bg-sky-50 py-0.5 px-2 rounded-sm inline-block mb-1">
-                      {quickViewProduct.brand} Premium Range
-                    </span>
+                    <div className="flex gap-2 items-center mb-1 flex-wrap">
+                      <span className="text-[10px] font-bold text-sky-600 tracking-wider uppercase bg-sky-50 py-0.5 px-2 rounded-sm inline-block">
+                        {quickViewProduct.brand} Premium Range
+                      </span>
+                      {(() => {
+                        const stock = quickViewProduct.stock !== undefined ? quickViewProduct.stock : (((quickViewProduct.id * 7) % 15) + 2);
+                        if (stock === 0) {
+                          return (
+                            <span className="text-[10px] font-extrabold px-2 py-0.5 bg-red-50 text-red-700 border border-red-200/50 rounded-sm flex items-center gap-1 animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                              <span>Out of Stock</span>
+                            </span>
+                          );
+                        }
+                        const isLow = stock <= 4;
+                        return isLow ? (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-sm flex items-center gap-1 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            <span>Low Stock: Only {stock} units left!</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/50 rounded-sm flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span>In Stock ({stock} Available)</span>
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <h3 className="text-lg sm:text-xl font-bold text-neutral-900 tracking-tight leading-snug">
                       {quickViewProduct.name}
                     </h3>
@@ -1662,6 +1940,35 @@ export default function App() {
                         </div>
                       )}
                     </div>
+
+                    {/* Notify me of stock levels */}
+                    {(() => {
+                      const stock = quickViewProduct.stock !== undefined ? quickViewProduct.stock : (((quickViewProduct.id * 7) % 15) + 2);
+                      if (stock === 0) {
+                        const isStockNotified = stockNotifications.some(sn => sn.productId === quickViewProduct.id);
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleNotifyMeClick(quickViewProduct);
+                            }}
+                            className={`w-full mt-3.5 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer ${
+                              isStockNotified
+                                ? 'bg-emerald-600 border-emerald-550 text-white hover:bg-emerald-700'
+                                : 'bg-amber-500 border-amber-450 text-white hover:bg-amber-600 shadow-xs'
+                            }`}
+                          >
+                            <Bell className={`w-4 h-4 ${isStockNotified ? 'fill-white' : ''}`} />
+                            <span>
+                              {isStockNotified
+                                ? 'Active: Subscribed to Stock Alerts'
+                                : 'Notify Me When Back in Stock'}
+                            </span>
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     {/* Notify me of price drops */}
                     <button
@@ -2140,6 +2447,8 @@ export default function App() {
         onUpdateOrders={setOrders}
         onAdvanceOrderStatus={handleAdvanceShipment}
         onTriggerToast={triggerToast}
+        stockAlerts={stockNotifications}
+        onClearStockAlert={(id) => setStockNotifications(prev => prev.filter(a => a.id !== id))}
       />
 
       {/* ========================================= */}

@@ -18,8 +18,10 @@ import {
   Copy, 
   CreditCard, 
   Search,
-  ExternalLink
+  ExternalLink,
+  FileDown
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { Order, CartItem, Product } from '../types.ts';
 
 interface OrderHistoryProps {
@@ -42,6 +44,193 @@ export default function OrderHistory({
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  const handleDownloadInvoice = (order: Order) => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Draw Top solid header banner matching BuyOman color scheme
+      doc.setFillColor(15, 23, 42); // slate-900 (deep aesthetic)
+      doc.rect(0, 0, 210, 42, 'F');
+
+      // Brand Title
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('BUYOMAN ELECTRONICS', 15, 18);
+
+      // Store Details / Sub-header
+      doc.setFontSize(8.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(186, 230, 253); // sky-200
+      doc.text('Oman\'s Ultimate Premium Smart Home Store', 15, 24);
+      doc.text('Azaiba Office Tower, Muscat, Sultanate of Oman', 15, 29);
+
+      // Tax Invoice Label
+      doc.setFontSize(15);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text('OFFICIAL INVOICE', 195, 18, { align: 'right' });
+
+      // Invoice metadata
+      doc.setFontSize(8.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(255, 255, 255);
+      doc.text(`Invoice Ref: INV-${order.id.substring(0, 10).toUpperCase()}`, 195, 24, { align: 'right' });
+      doc.text(`Date of Issue: ${order.date}`, 195, 29, { align: 'right' });
+      doc.text(`Transaction Status: Paid & Confirmed`, 195, 34, { align: 'right' });
+
+      // Addresses section
+      let y = 55;
+      doc.setFontSize(10);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text('SHIP TO / CUSTOMER DETAILS:', 15, y);
+      doc.text('SUPPLIER / STORE OFFICE:', 110, y);
+
+      y += 6;
+      doc.setFontSize(8.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(31, 41, 55); // neutral-800
+      doc.text(order.billingInfo.fullName, 15, y);
+      doc.text('BuyOman E-store LLC', 110, y);
+
+      y += 5;
+      doc.text(order.billingInfo.addressLines, 15, y);
+      doc.text('CR Number: 1409552 / Oman Tech City', 110, y);
+
+      y += 5;
+      doc.text(`${order.billingInfo.city}, ${order.billingInfo.governorate}, Oman`, 15, y);
+      doc.text('Contact GSM: +968 2455 1200', 110, y);
+
+      y += 5;
+      doc.text(`Contact Phone: ${order.billingInfo.phone}`, 15, y);
+      doc.text('Email support: billing@buyoman.com', 110, y);
+
+      y += 12;
+
+      // Divider Line
+      doc.setDrawColor(229, 231, 235); // neutral-205 border
+      doc.setLineWidth(0.4);
+      doc.line(15, y, 195, y);
+
+      y += 10;
+
+      // Items Table Header
+      doc.setFillColor(243, 244, 246); // gray-100 banner
+      doc.rect(15, y, 180, 8, 'F');
+      
+      doc.setFontSize(8.5);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(75, 85, 99); // gray-600
+      doc.text('Item Electronics Package', 18, y + 5.5);
+      doc.text('Brand', 110, y + 5.5);
+      doc.text('Qty', 140, y + 5.5, { align: 'center' });
+      doc.text('Unit Price', 165, y + 5.5, { align: 'right' });
+      doc.text('Subtotal', 190, y + 5.5, { align: 'right' });
+
+      y += 8;
+
+      // Items Table Rows
+      doc.setFont('Helvetica', 'normal');
+      order.items.forEach((item, index) => {
+        // Alternating zebra backgrounds
+        if (index % 2 === 1) {
+          doc.setFillColor(249, 250, 251); // gray-50
+          doc.rect(15, y, 180, 10, 'F');
+        }
+        
+        doc.setTextColor(17, 24, 39); // gray-900
+
+        // Truncate long item names politely
+        const rawName = item.product.name;
+        const displayName = rawName.length > 52 ? `${rawName.substring(0, 49)}...` : rawName;
+
+        doc.text(displayName, 18, y + 6.5);
+        doc.text(item.product.brand, 110, y + 6.5);
+        doc.text(item.quantity.toString(), 140, y + 6.5, { align: 'center' });
+        doc.text(`OMR ${item.product.price.toFixed(3)}`, 165, y + 6.5, { align: 'right' });
+        
+        const lineTotal = item.product.price * item.quantity;
+        doc.text(`OMR ${lineTotal.toFixed(3)}`, 190, y + 6.5, { align: 'right' });
+
+        doc.setDrawColor(243, 244, 246);
+        doc.line(15, y + 10, 195, y + 10);
+        
+        y += 10;
+      });
+
+      y += 6;
+
+      // Totals Panel
+      const rightColX = 135;
+      doc.setFontSize(8.5);
+      
+      // Subtotal
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(107, 114, 128); // gray-500
+      doc.text('Subtotal Base Price:', rightColX, y);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(31, 41, 55);
+      doc.text(`OMR ${order.subtotal.toFixed(3)}`, 190, y, { align: 'right' });
+
+      // Delivery Fee
+      y += 6;
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(107, 114, 128);
+      doc.text('Oman Governorate Delivery Fee:', rightColX, y);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(31, 41, 55);
+      doc.text(`OMR ${order.deliveryFee.toFixed(3)}`, 190, y, { align: 'right' });
+
+      // Grand Total Row with Slate Dark Highlights
+      y += 9;
+      doc.setLineWidth(0.6);
+      doc.setDrawColor(15, 23, 42); // solid block underline
+      doc.line(rightColX, y - 4, 195, y - 4);
+
+      doc.setFontSize(10.5);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text('GRAND TOTAL DUE:', rightColX, y);
+      doc.text(`OMR ${order.total.toFixed(3)}`, 190, y, { align: 'right' });
+
+      // Payment Details & Method Info
+      y += 18;
+      doc.setFontSize(8.5);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text('PAYMENT DETAILS & METHOD:', 15, y);
+
+      y += 5;
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(75, 85, 99);
+      const isCod = order.billingInfo.paymentMethod === 'cod';
+      const paymentMsg = isCod
+        ? 'Cash on Delivery (COD). Please have the exact payment of OMR ' + order.total.toFixed(3) + ' ready when dispatch courier contacts.'
+        : 'Credit/Debit Card payment was successfully pre-authorized and drafted securely online.';
+      doc.text(paymentMsg, 15, y);
+
+      // Disclaimer / Thank you block in footer
+      doc.setDrawColor(229, 231, 235);
+      doc.line(15, 272, 195, 272);
+      
+      doc.setFontSize(8);
+      doc.setTextColor(156, 163, 175);
+      doc.text('This is an electronically generated document. No physical signature is required under Omani E-Commerce Law.', 105, 278, { align: 'center' });
+      doc.text('Thank you for shopping premium appliances at BuyOman! Reach us at support@buyoman.com for refunds or queries.', 105, 282, { align: 'center' });
+
+      // Save PDF triggering immediate download
+      doc.save(`BuyOman-Invoice-${order.id}.pdf`);
+    } catch (err) {
+      console.error("Failed to generate PDF Invoice: ", err);
+      alert("Error generating printable invoice PDF. Please try again.");
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -384,8 +573,16 @@ export default function OrderHistory({
                                 </div>
                                 <div className="flex gap-2 w-full sm:w-auto shrink-0 flex-wrap">
                                   <button
+                                    onClick={() => handleDownloadInvoice(order)}
+                                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 border border-emerald-600 transition cursor-pointer"
+                                    title="Download printable PDF Invoice"
+                                  >
+                                    <FileDown className="w-3.5 h-3.5" />
+                                    <span>Download Invoice</span>
+                                  </button>
+                                  <button
                                     onClick={() => onTrackOrder(order)}
-                                    className="flex-1 sm:flex-none px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white font-extrabold rounded-lg text-[10px] uppercase tracking-wider tracking-widest flex items-center justify-center gap-1 border border-neutral-900"
+                                    className="flex-1 sm:flex-none px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white font-extrabold rounded-lg text-[10px] uppercase tracking-wider tracking-widest flex items-center justify-center gap-1 border border-neutral-900 cursor-pointer"
                                   >
                                     <ExternalLink className="w-3.5 h-3.5" />
                                     <span>Live Track</span>
@@ -393,7 +590,7 @@ export default function OrderHistory({
                                   {onAdvanceStatus && (
                                     <button
                                       onClick={() => onAdvanceStatus(order.id)}
-                                      className="flex-1 sm:flex-none px-4 py-2 bg-white hover:bg-sky-100/50 text-sky-800 font-extrabold rounded-lg text-[10px] uppercase tracking-wider border border-sky-200 transition"
+                                      className="flex-1 sm:flex-none px-4 py-2 bg-white hover:bg-sky-100/50 text-sky-800 font-extrabold rounded-lg text-[10px] uppercase tracking-wider border border-sky-200 transition cursor-pointer"
                                     >
                                       Simulate Step ➡️
                                     </button>

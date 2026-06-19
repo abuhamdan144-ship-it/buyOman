@@ -27,7 +27,8 @@ import {
   Upload,
   Image,
   Zap,
-  Percent
+  Percent,
+  Bell
 } from 'lucide-react';
 import { Product, Order } from '../types.ts';
 import { OMAN_GOVERNORATES } from '../data.ts';
@@ -41,6 +42,8 @@ interface AdminDashboardProps {
   onUpdateOrders: (updated: Order[]) => void;
   onAdvanceOrderStatus: (orderId: string) => void;
   onTriggerToast: (msg: string) => void;
+  stockAlerts?: Array<{ id: string, productId: number, email: string, productName: string }>;
+  onClearStockAlert?: (alertId: string) => void;
 }
 
 export default function AdminDashboard({
@@ -52,6 +55,8 @@ export default function AdminDashboard({
   onUpdateOrders,
   onAdvanceOrderStatus,
   onTriggerToast,
+  stockAlerts = [],
+  onClearStockAlert,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<'analytics' | 'inventory' | 'orders' | 'promotions'>('analytics');
 
@@ -82,6 +87,7 @@ export default function AdminDashboard({
   const [newProdDesc, setNewProdDesc] = useState('');
   const [newProdSpecs, setNewProdSpecs] = useState('');
   const [newProdBadge, setNewProdBadge] = useState<'new' | 'sale' | 'hot' | 'best' | ''>('');
+  const [newProdStock, setNewProdStock] = useState<string>('12');
 
   // High quality image upload state representation
   const [newProdImage, setNewProdImage] = useState<string>(''); // Base64 Data URL string
@@ -179,7 +185,8 @@ export default function AdminDashboard({
       description: newProdDesc || `${newProdBrand} flagship device tailored with premium specifications.`,
       specs: newProdSpecs ? newProdSpecs.split(',').map(s => s.trim()) : ["Premium Build", "Custom Operations"],
       badge: newProdBadge ? newProdBadge as any : undefined,
-      image: newProdImage || undefined
+      image: newProdImage || undefined,
+      stock: newProdStock ? parseInt(newProdStock) : 12,
     };
 
     onUpdateProducts([newProd, ...products]);
@@ -202,6 +209,7 @@ export default function AdminDashboard({
     setNewProdSpecs('');
     setNewProdBadge('');
     setNewProdImage('');
+    setNewProdStock('12');
     setIsDragging(false);
   };
 
@@ -530,6 +538,46 @@ export default function AdminDashboard({
                 {/* 2. INVENTORY CONTROL TAB */}
                 {activeTab === 'inventory' && (
                   <div className="space-y-6 animate-zoom-in">
+
+                    {/* Active Restock Submissions */}
+                    {stockAlerts.length > 0 && (
+                      <div className="bg-neutral-900 border border-amber-500/20 rounded-2xl p-4 sm:p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Bell className="w-4 h-4 text-amber-500 animate-pulse" />
+                          <h4 className="text-xs font-bold text-amber-400 uppercase tracking-widest">Active Restock Alert Subscribers ({stockAlerts.length})</h4>
+                        </div>
+                        <p className="text-[11px] text-neutral-400 mb-4 leading-relaxed">
+                          Customers have signed up to receive automated restock email bulletins. Increasing these product inventory stock levels above 0 will trigger automated emails.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1">
+                          {stockAlerts.map((alert) => {
+                            const relatedProd = products.find(p => p.id === alert.productId);
+                            return (
+                              <div key={alert.id} className="bg-neutral-950 border border-neutral-850 rounded-xl p-3 flex justify-between items-center text-[11px]">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-white">
+                                    <span className="text-xs">{relatedProd?.emoji || '📦'}</span>
+                                    <span className="truncate max-w-[130px] inline-block" title={alert.productName}>{alert.productName}</span>
+                                  </div>
+                                  <span className="text-neutral-400 font-mono tracking-xs block select-all">{alert.email}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onClearStockAlert?.(alert.id);
+                                    onTriggerToast(`🗑️ Restock alert for ${alert.email} dismissed.`);
+                                  }}
+                                  className="p-1 px-2 border border-red-900/40 hover:bg-red-955 hover:text-red-400 rounded-md transition text-[9px] font-extrabold uppercase shrink-0"
+                                  title="Dismiss Alert"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Add New Product Trigger Button Bar */}
                     <div className="flex justify-between items-center gap-4">
@@ -581,7 +629,7 @@ export default function AdminDashboard({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                           <div>
                             <label className="block mb-1 text-neutral-400">Store Category *</label>
                             <select
@@ -650,6 +698,18 @@ export default function AdminDashboard({
                               onChange={e => setNewProdOldPrice(e.target.value)}
                               placeholder="e.g. 199.00"
                               className="w-full bg-neutral-900 border border-neutral-850 rounded-lg p-2.5 focus:outline-none focus:border-sky-500 text-white font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block mb-1 text-neutral-400">Inventory Stock *</label>
+                            <input
+                              type="number"
+                              value={newProdStock}
+                              onChange={e => setNewProdStock(e.target.value)}
+                              placeholder="e.g. 15"
+                              min="0"
+                              className="w-full bg-neutral-900 border border-neutral-850 rounded-lg p-2.5 focus:outline-none focus:border-sky-500 text-white font-mono"
+                              required
                             />
                           </div>
                         </div>
@@ -782,7 +842,7 @@ export default function AdminDashboard({
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div>
                             <label className="block mb-1 text-neutral-400">Product Title</label>
                             <input
@@ -800,6 +860,16 @@ export default function AdminDashboard({
                               step="0.001"
                               value={editingProduct.price}
                               onChange={e => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })}
+                              className="w-full bg-neutral-900 border border-neutral-850 rounded-lg p-2.5 focus:outline-none text-white font-mono"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block mb-1 text-neutral-400">Inventory Stock</label>
+                            <input
+                              type="number"
+                              value={editingProduct.stock !== undefined ? editingProduct.stock : (((editingProduct.id * 7) % 15) + 2)}
+                              onChange={e => setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })}
                               className="w-full bg-neutral-900 border border-neutral-850 rounded-lg p-2.5 focus:outline-none text-white font-mono"
                               required
                             />
@@ -911,6 +981,21 @@ export default function AdminDashboard({
                             </div>
 
                             <div className="flex items-center gap-4 shrink-0 pl-4 text-right">
+                              <div className="text-left shrink-0">
+                                {(() => {
+                                  const stock = p.stock !== undefined ? p.stock : (((p.id * 7) % 15) + 2);
+                                  const isLow = stock <= 4;
+                                  return (
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-block border ${
+                                      isLow 
+                                        ? 'bg-amber-950/40 text-amber-300 border-amber-850' 
+                                        : 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50'
+                                    }`}>
+                                      {stock} units ({isLow ? 'Low' : 'OK'})
+                                    </span>
+                                  );
+                                })()}
+                              </div>
                               <div>
                                 <span className="font-extrabold font-mono text-white text-sm block">OMR {p.price.toFixed(3)}</span>
                                 {p.oldPrice && (

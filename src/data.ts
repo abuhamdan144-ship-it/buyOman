@@ -102,7 +102,8 @@ export const PRODUCTS_DATA: Product[] = [
     badge: "hot",
     category: "mobile",
     description: "Co-engineered with Leica, featuring a legendary quad-camera system with a 1-inch main sensor and infinite variable aperture for professional film-quality photography right on your phone.",
-    specs: ["Leica Leica Summilux Optics", "Snapdragon 8 Gen 3", "WQHD+ Dynamic AMOLED", "90W HyperCharge + 80W Wireless", "Xiaomi Guardian Structure Protection"]
+    specs: ["Leica Leica Summilux Optics", "Snapdragon 8 Gen 3", "WQHD+ Dynamic AMOLED", "90W HyperCharge + 80W Wireless", "Xiaomi Guardian Structure Protection"],
+    stock: 0
   },
   {
     id: 8,
@@ -130,7 +131,8 @@ export const PRODUCTS_DATA: Product[] = [
     badge: "sale",
     category: "wasing_machin",
     description: "Bosch washing machine with EcoSilence Drive: enjoy extremely quiet operation and excellent durability. SpeedPerfect decreases cycle duration by up to 65% with optimal clean results.",
-    specs: ["9kg Drum Capacity", "EcoSilence Drive Inverter", "SpeedPerfect Speed-up System", "VarioDrum Gentle Fiber Care", "AntiVibration Noise-muffling Sidewalls"]
+    specs: ["9kg Drum Capacity", "EcoSilence Drive Inverter", "SpeedPerfect Speed-up System", "VarioDrum Gentle Fiber Care", "AntiVibration Noise-muffling Sidewalls"],
+    stock: 0
   },
   {
     id: 10,

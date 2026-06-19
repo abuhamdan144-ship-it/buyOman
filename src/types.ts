@@ -17,6 +17,7 @@ export interface Product {
   description: string;
   specs: string[];
   image?: string; // High quality uploaded image (Base64 string)
+  stock?: number;
 }
 
 export interface CartItem {
