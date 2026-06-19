@@ -28,6 +28,7 @@ interface OrderHistoryProps {
   orders: Order[];
   onTrackOrder: (order: Order) => void;
   onAdvanceStatus?: (orderId: string) => void;
+  onWriteReview?: (product: Product) => void;
 }
 
 export default function OrderHistory({
@@ -35,7 +36,8 @@ export default function OrderHistory({
   onClose,
   orders,
   onTrackOrder,
-  onAdvanceStatus
+  onAdvanceStatus,
+  onWriteReview
 }: OrderHistoryProps) {
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -309,6 +311,17 @@ export default function OrderHistory({
                                         <div>
                                           <h4 className="text-xs font-bold text-neutral-800 line-clamp-1">{item.product.name}</h4>
                                           <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">{item.product.brand}</p>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onWriteReview?.(item.product);
+                                            }}
+                                            className="mt-1.5 flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-black text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-305/40 rounded-sm transition cursor-pointer"
+                                            title="Submit rating or feedback for this item"
+                                          >
+                                            ★ Rate & Review item
+                                          </button>
                                         </div>
                                       </div>
                                       <div className="text-right text-xs shrink-0 pl-4">

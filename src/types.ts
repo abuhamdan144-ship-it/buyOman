@@ -52,3 +52,14 @@ export interface Message {
   text: string;
   timestamp: Date;
 }
+
+export interface Review {
+  id: string;
+  productId: number;
+  userName: string;
+  rating: number;
+  comment: string;
+  date: string;
+  isVerifiedPurchase: boolean;
+}
+

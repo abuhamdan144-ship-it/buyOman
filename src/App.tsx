@@ -30,12 +30,13 @@ import {
   GitCompare
 } from 'lucide-react';
 import { PRODUCTS_DATA, SMALL_APPLIANCES, OMAN_GOVERNORATES } from './data.ts';
-import { Product, CartItem, BillingInfo, Order, Message } from './types.ts';
+import { Product, CartItem, BillingInfo, Order, Message, Review } from './types.ts';
 import Navbar from './components/Navbar.tsx';
 import HeroSlider from './components/HeroSlider.tsx';
 import ProductCard from './components/ProductCard.tsx';
 import OrderHistory from './components/OrderHistory.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
+import ReviewsSection from './components/ReviewsSection.tsx';
 
 // Persistent storage keys
 const CART_STORAGE_KEY = 'buyoman_cart_data';
@@ -80,6 +81,45 @@ const getSpecDetail = (product: Product, type: 'performance' | 'display' | 'batt
   return specs[0] || "Standard Specification Verified";
 };
 
+const DEFAULT_REVIEWS: Review[] = [
+  {
+    id: "rev-1",
+    productId: 1,
+    userName: "Ahmed Al-Masrouri",
+    rating: 5,
+    comment: "Excellent phone. The titanium structure makes it feel much lighter than my previous 13 Pro Max. Camera zoom is spectacular, perfect for snapping photos in Muscat!",
+    date: "2026-06-01",
+    isVerifiedPurchase: true
+  },
+  {
+    id: "rev-2",
+    productId: 1,
+    userName: "Fatma Al-Lawati",
+    rating: 4,
+    comment: "Great quality and beautiful display. Battery life easily lasts 1.5 days. Highly recommend for any power user in Oman. The only issue is the price is slightly steep, but worth it.",
+    date: "2026-06-10",
+    isVerifiedPurchase: true
+  },
+  {
+    id: "rev-3",
+    productId: 2,
+    userName: "Mazin Al-Busaidi",
+    rating: 5,
+    comment: "The built-in S pen and new AI live translate are game-changers for my business meetings! S24 Ultra screen has almost zero glare in our bright Omani sunshine.",
+    date: "2026-05-28",
+    isVerifiedPurchase: true
+  },
+  {
+    id: "rev-4",
+    productId: 3,
+    userName: "Said Al-Harthy",
+    rating: 5,
+    comment: "Incredible battery life (22 hours matches the specs!) and the speed of compilation on Apple Silicon is unmatched. Essential tool for software developers.",
+    date: "2026-06-15",
+    isVerifiedPurchase: true
+  }
+];
+
 export default function App() {
   // Navigation & Category States
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -93,6 +133,24 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+
+  // Reviews & Rating System State
+  const [reviews, setReviews] = useState<Review[]>(() => {
+    try {
+      const saved = localStorage.getItem('buyoman_reviews_data');
+      return saved ? JSON.parse(saved) : DEFAULT_REVIEWS;
+    } catch {
+      return DEFAULT_REVIEWS;
+    }
+  });
+
+  // Keep reviews synced to localStorage
+  useEffect(() => {
+    localStorage.setItem('buyoman_reviews_data', JSON.stringify(reviews));
+  }, [reviews]);
+
+  // Tab State for Quick View Details Modal
+  const [quickViewTab, setQuickViewTab] = useState<'specs' | 'reviews'>('specs');
 
   // Price Drop alerts tracking lists
   const [priceAlertSubscriptions, setPriceAlertSubscriptions] = useState<number[]>(() => {
@@ -305,6 +363,59 @@ export default function App() {
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
+  };
+
+  // Reviews and Verification Handlers
+  const hasPurchasedProduct = (productId: number) => {
+    return orders.some(o => o.items.some(item => item.product.id === productId));
+  };
+
+  const handleAddReview = (productId: number, userName: string, rating: number, comment: string) => {
+    const newReview: Review = {
+      id: `rev-${Date.now()}`,
+      productId,
+      userName: userName.trim() || 'Verified Customer',
+      rating,
+      comment: comment.trim(),
+      date: new Date().toISOString().split('T')[0],
+      isVerifiedPurchase: true
+    };
+
+    const updatedReviews = [newReview, ...reviews];
+    setReviews(updatedReviews);
+
+    // Recalculate average rating
+    const productReviews = updatedReviews.filter(r => r.productId === productId);
+    const avgRating = productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length;
+    const roundedRating = Math.round(avgRating * 10) / 10;
+
+    // Update products state & product list persistence
+    setProducts(prevProducts => {
+      const updated = prevProducts.map(p => {
+        if (p.id === productId) {
+          return {
+            ...p,
+            rating: roundedRating,
+            reviews: productReviews.length
+          };
+        }
+        return p;
+      });
+      localStorage.setItem('buyoman_products_data', JSON.stringify(updated));
+      return updated;
+    });
+
+    // Also update current active quick view if open
+    setQuickViewProduct(prev => {
+      if (prev && prev.id === productId) {
+        return {
+          ...prev,
+          rating: roundedRating,
+          reviews: productReviews.length
+        };
+      }
+      return prev;
+    });
   };
 
   // Cart Management
@@ -610,7 +721,7 @@ export default function App() {
       <div id="hero-carousel-block">
         <HeroSlider 
           onAddToCart={handleAddToCart}
-          onExploreProduct={(p) => setQuickViewProduct(p)}
+          onExploreProduct={(p) => { setQuickViewTab('specs'); setQuickViewProduct(p); }}
         />
       </div>
 
@@ -745,7 +856,7 @@ export default function App() {
                   isComparing={compareIds.includes(prod.id)}
                   onAddToCart={handleAddToCart}
                   onToggleWishlist={handleToggleWishlist}
-                  onQuickView={(p) => setQuickViewProduct(p)}
+                  onQuickView={(p) => { setQuickViewTab('specs'); setQuickViewProduct(p); }}
                   onTogglePriceAlert={handleTogglePriceAlert}
                   onToggleCompare={handleToggleCompare}
                 />
@@ -1475,18 +1586,59 @@ export default function App() {
                       </span>
                     </button>
 
-                    {/* Key Specifications List */}
-                    <div className="mt-5">
-                      <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider mb-2.5">Detailed Features & Hardware</h4>
-                      <ul className="space-y-1.5">
-                        {quickViewProduct.specs.map((spec, i) => (
-                          <li key={i} className="text-xs font-medium text-neutral-600 flex items-center gap-2">
-                            <span className="text-sky-500 text-sm">✓</span>
-                            <span>{spec}</span>
-                          </li>
-                        ))}
-                      </ul>
+                    {/* Tabs Segment */}
+                    <div className="mt-6 border-b border-neutral-100 flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setQuickViewTab('specs')}
+                        className={`pb-2 text-xs font-bold tracking-wider uppercase border-b-2 transition cursor-pointer ${
+                          quickViewTab === 'specs'
+                            ? 'border-sky-600 text-sky-700 font-extrabold'
+                            : 'border-transparent text-neutral-400 hover:text-neutral-700'
+                        }`}
+                      >
+                        Specs & Hardware
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickViewTab('reviews')}
+                        className={`pb-2 text-xs font-bold tracking-wider uppercase border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                          quickViewTab === 'reviews'
+                            ? 'border-sky-600 text-sky-700 font-extrabold'
+                            : 'border-transparent text-neutral-400 hover:text-neutral-700'
+                        }`}
+                      >
+                        <span>Verified Reviews</span>
+                        <span className="bg-neutral-100 px-1.5 py-0.5 rounded text-[10px] text-neutral-500">
+                          {reviews.filter(r => r.productId === quickViewProduct.id).length}
+                        </span>
+                      </button>
                     </div>
+
+                    {/* Tab 1: Specs */}
+                    {quickViewTab === 'specs' && (
+                      <div className="mt-5">
+                        <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider mb-2.5">Detailed Features & Hardware</h4>
+                        <ul className="space-y-1.5">
+                          {quickViewProduct.specs.map((spec, i) => (
+                            <li key={i} className="text-xs font-medium text-neutral-600 flex items-center gap-2">
+                              <span className="text-sky-500 text-sm">✓</span>
+                              <span>{spec}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Tab 2: Reviews */}
+                    {quickViewTab === 'reviews' && (
+                      <ReviewsSection 
+                        productId={quickViewProduct.id}
+                        reviews={reviews.filter(r => r.productId === quickViewProduct.id)}
+                        hasPurchased={hasPurchasedProduct(quickViewProduct.id)}
+                        onAddReview={(userName, rating, comment) => handleAddReview(quickViewProduct.id, userName, rating, comment)}
+                      />
+                    )}
 
                   </div>
 
@@ -1854,6 +2006,11 @@ export default function App() {
           }, 300);
         }}
         onAdvanceStatus={handleAdvanceShipment}
+        onWriteReview={(p) => {
+          setOrdersOpen(false);
+          setQuickViewTab('reviews');
+          setQuickViewProduct(p);
+        }}
       />
 
       {/* ========================================= */}
@@ -2163,6 +2320,7 @@ export default function App() {
                                 </button>
                                 <button
                                   onClick={() => {
+                                    setQuickViewTab('specs');
                                     setQuickViewProduct(p);
                                     setCompareModalOpen(false);
                                   }}
